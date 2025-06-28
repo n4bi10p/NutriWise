@@ -1,10 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Profile, saveMealPlanToDatabase, getActiveMealPlan, getUserMealPlans, setActiveMealPlan, deleteMealPlan, SavedMealPlan } from '../lib/supabase'
 import { generateMealPlan, generateWeeklyNutritionRecommendations } from '../lib/gemini'
 import { 
   Calendar, Loader, RefreshCw, Target, Sparkles, Sunrise, Sun, Moon, Apple, Info, 
-  Save, History, Trash2, Check, X, Plus, BookOpen
+  History, Trash2, Check, X, BookOpen
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+// Helper function to assign meal icons
+const assignMealIcon = (mealType: string): LucideIcon => {
+  const mealIcons: Record<string, LucideIcon> = {
+    'breakfast': Sunrise,
+    'lunch': Sun,
+    'dinner': Moon,
+    'snack': Apple
+  }
+  return mealIcons[mealType.toLowerCase()] || Apple
+}
 
 interface MealPlannerProps {
   profile: Profile
@@ -21,7 +33,7 @@ interface ParsedMealPlan {
       calories: string
       protein: string
       description: string
-      icon: any
+      icon: LucideIcon
     }>
     totalCalories: string
     totalProtein: string
@@ -35,35 +47,57 @@ export function MealPlanner({ profile }: MealPlannerProps) {
   const [loading, setLoading] = useState(false)
   const [loadingRecommendations, setLoadingRecommendations] = useState(false)
   const [activeTab, setActiveTab] = useState<'meal-plan' | 'recommendations'>('meal-plan')
-  const [saving, setSaving] = useState(false)
-  const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [showHistoryDialog, setShowHistoryDialog] = useState(false)
-  const [planName, setPlanName] = useState('')
   const [savedPlans, setSavedPlans] = useState<SavedMealPlan[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+  const [justGeneratedPlan, setJustGeneratedPlan] = useState(false)
 
   useEffect(() => {
-    loadActivePlans()
-  }, [profile.user_id])
+    if (!initialLoadComplete && !justGeneratedPlan) {
+      loadActivePlans().then(() => {
+        setInitialLoadComplete(true)
+        console.log('Initial load complete')
+      })
+    }
+  }, [profile.user_id, initialLoadComplete, justGeneratedPlan])
 
   const loadActivePlans = async () => {
     try {
+      console.log('Loading active plans...')
       // Load active meal plan
       const activeMealPlan = await getActiveMealPlan(profile.user_id, 'weekly_meal_plan')
       if (activeMealPlan) {
+        console.log('Found active meal plan, loading...')
         setMealPlan(activeMealPlan.plan_content)
         if (activeMealPlan.parsed_data && Object.keys(activeMealPlan.parsed_data).length > 0) {
-          setParsedMealPlan(activeMealPlan.parsed_data)
+          // Reassign icons to meals when loading from database
+          const parsedWithIcons = {
+            ...activeMealPlan.parsed_data,
+            days: activeMealPlan.parsed_data.days?.map((day: any) => ({
+              ...day,
+              meals: day.meals?.map((meal: any) => ({
+                ...meal,
+                icon: assignMealIcon(meal.type)
+              }))
+            }))
+          }
+          setParsedMealPlan(parsedWithIcons)
         } else {
           const parsed = parseMealPlan(activeMealPlan.plan_content)
           setParsedMealPlan(parsed)
         }
+      } else {
+        console.log('No active meal plan found')
       }
 
       // Load active nutrition strategy
       const activeStrategy = await getActiveMealPlan(profile.user_id, 'nutrition_strategy')
       if (activeStrategy) {
+        console.log('Found active nutrition strategy, loading...')
         setNutritionRecommendations(activeStrategy.plan_content)
+      } else {
+        console.log('No active nutrition strategy found')
       }
     } catch (error) {
       console.error('Error loading active plans:', error)
@@ -84,131 +118,163 @@ export function MealPlanner({ profile }: MealPlannerProps) {
   }
 
   const parseMealPlan = (planText: string): ParsedMealPlan => {
-    const lines = planText.split('\n').filter(line => line.trim())
-    const result: ParsedMealPlan = { days: [] }
-    
-    let currentDay: any = null
-    let notesSection = false
-    let notes = ''
-
-    const mealIcons = {
-      'breakfast': Sunrise,
-      'lunch': Sun,
-      'dinner': Moon,
-      'snack': Apple
-    }
-
-    for (const line of lines) {
-      const trimmedLine = line.trim()
+    try {
+      const lines = planText.split('\n').filter(line => line.trim())
+      const result: ParsedMealPlan = { days: [] }
       
-      // Check for notes section
-      if (trimmedLine.toLowerCase().includes('shopping tips') || 
-          trimmedLine.toLowerCase().includes('meal prep') ||
-          trimmedLine.toLowerCase().includes('notes') ||
-          trimmedLine.toLowerCase().includes('tips')) {
-        notesSection = true
-        continue
-      }
+      let currentDay: any = null
+      let notesSection = false
+      let notes = ''
 
-      if (notesSection) {
-        notes += trimmedLine + ' '
-        continue
-      }
-
-      // Check for day headers
-      const dayMatch = trimmedLine.match(/Day\s+(\d+)\s*-\s*(\w+)/i)
-      if (dayMatch) {
-        if (currentDay) {
-          result.days.push(currentDay)
+      for (const line of lines) {
+        const trimmedLine = line.trim()
+        
+        // Check for notes section
+        if (trimmedLine.toLowerCase().includes('shopping tips') || 
+            trimmedLine.toLowerCase().includes('meal prep') ||
+            trimmedLine.toLowerCase().includes('notes') ||
+            trimmedLine.toLowerCase().includes('tips')) {
+          notesSection = true
+          continue
         }
-        currentDay = {
-          dayNumber: parseInt(dayMatch[1]),
-          dayName: dayMatch[2],
-          meals: [],
-          totalCalories: '',
-          totalProtein: ''
-        }
-        continue
-      }
 
-      // Check for meal entries
-      const mealMatch = trimmedLine.match(/🌅|🌞|🌙|🍎/)
-      if (mealMatch && currentDay) {
-        const mealText = trimmedLine.replace(/🌅|🌞|🌙|🍎/, '').trim()
-        const parts = mealText.split(':')
-        if (parts.length >= 2) {
-          const mealType = parts[0].trim().toLowerCase()
-          const mealInfo = parts[1].trim()
-          
-          // Extract calories and protein
-          const calorieMatch = mealInfo.match(/(\d+)\s*calories?/i)
-          const proteinMatch = mealInfo.match(/(\d+)g?\s*protein/i)
-          
-          const meal = {
-            type: mealType,
-            name: mealInfo.split('(')[0].trim(),
-            calories: calorieMatch ? calorieMatch[1] : '',
-            protein: proteinMatch ? proteinMatch[1] : '',
-            description: '',
-            icon: mealIcons[mealType as keyof typeof mealIcons] || Apple
+        if (notesSection) {
+          notes += trimmedLine + ' '
+          continue
+        }
+
+        // Check for day headers
+        const dayMatch = trimmedLine.match(/Day\s+(\d+)\s*-\s*(\w+)/i)
+        if (dayMatch) {
+          if (currentDay) {
+            result.days.push(currentDay)
           }
-          
-          currentDay.meals.push(meal)
+          currentDay = {
+            dayNumber: parseInt(dayMatch[1]),
+            dayName: dayMatch[2],
+            meals: [],
+            totalCalories: '',
+            totalProtein: ''
+          }
+          continue
         }
-        continue
-      }
 
-      // Check for meal descriptions
-      if (currentDay && currentDay.meals.length > 0 && 
-          !trimmedLine.includes('Daily Total') && 
-          !trimmedLine.match(/Day\s+\d+/i)) {
-        const lastMeal = currentDay.meals[currentDay.meals.length - 1]
-        if (!lastMeal.description) {
-          lastMeal.description = trimmedLine
+        // Check for meal entries
+        const mealMatch = trimmedLine.match(/🌅|🌞|🌙|🍎/)
+        if (mealMatch && currentDay) {
+          const mealText = trimmedLine.replace(/🌅|🌞|🌙|🍎/, '').trim()
+          const parts = mealText.split(':')
+          if (parts.length >= 2) {
+            const mealType = parts[0].trim().toLowerCase()
+            const mealInfo = parts[1].trim()
+            
+            // Extract calories and protein
+            const calorieMatch = mealInfo.match(/(\d+)\s*calories?/i)
+            const proteinMatch = mealInfo.match(/(\d+)g?\s*protein/i)
+            
+            const meal = {
+              type: mealType,
+              name: mealInfo.split('(')[0].trim(),
+              calories: calorieMatch ? calorieMatch[1] : '',
+              protein: proteinMatch ? proteinMatch[1] : '',
+              description: '',
+              icon: assignMealIcon(mealType)
+            }
+            
+            currentDay.meals.push(meal)
+          }
+          continue
+        }
+
+        // Check for meal descriptions
+        if (currentDay && currentDay.meals.length > 0 && 
+            !trimmedLine.includes('Daily Total') && 
+            !trimmedLine.match(/Day\s+\d+/i)) {
+          const lastMeal = currentDay.meals[currentDay.meals.length - 1]
+          if (!lastMeal.description) {
+            lastMeal.description = trimmedLine
+          }
+        }
+
+        // Check for daily totals
+        const totalMatch = trimmedLine.match(/Daily Total.*?(\d+)\s*calories.*?(\d+)g?\s*protein/i)
+        if (totalMatch && currentDay) {
+          currentDay.totalCalories = totalMatch[1]
+          currentDay.totalProtein = totalMatch[2]
         }
       }
 
-      // Check for daily totals
-      const totalMatch = trimmedLine.match(/Daily Total.*?(\d+)\s*calories.*?(\d+)g?\s*protein/i)
-      if (totalMatch && currentDay) {
-        currentDay.totalCalories = totalMatch[1]
-        currentDay.totalProtein = totalMatch[2]
+      if (currentDay) {
+        result.days.push(currentDay)
+      }
+
+      if (notes.trim()) {
+        result.notes = notes.trim()
+      }
+
+      console.log('Parsing successful:', result)
+      return result
+    } catch (error) {
+      console.error('Error parsing meal plan:', error)
+      // Return a structure that will show the raw meal plan
+      return {
+        days: [],
+        notes: 'Meal plan generated successfully. View the raw text below if parsing failed.'
       }
     }
-
-    if (currentDay) {
-      result.days.push(currentDay)
-    }
-
-    if (notes.trim()) {
-      result.notes = notes.trim()
-    }
-
-    return result
   }
 
   const handleGeneratePlan = async () => {
     setLoading(true)
+    setJustGeneratedPlan(true) // Prevent loadActivePlans from overriding our new plan
     try {
       const plan = await generateMealPlan(profile)
+      console.log('Generated meal plan:', plan)
       setMealPlan(plan)
+      
       const parsed = parseMealPlan(plan)
+      console.log('Parsed meal plan:', parsed)
       setParsedMealPlan(parsed)
       
-      // Auto-save the generated plan
-      const defaultName = `Meal Plan - ${new Date().toLocaleDateString()}`
-      await saveMealPlanToDatabase(
-        profile.user_id,
-        defaultName,
-        'weekly_meal_plan',
-        plan,
-        parsed
-      )
+      // Auto-save the generated plan (but don't fail if save fails)
+      try {
+        const defaultName = `Meal Plan - ${new Date().toLocaleDateString()}`
+        console.log('Attempting to save meal plan to database...')
+        // Remove icons from parsed data before saving to database
+        const parsedForDB = {
+          ...parsed,
+          days: parsed.days?.map((day: any) => ({
+            ...day,
+            meals: day.meals?.map((meal: any) => {
+              const { icon, ...mealWithoutIcon } = meal
+              return mealWithoutIcon
+            })
+          }))
+        }
+        const saveResult = await saveMealPlanToDatabase(
+          profile.user_id,
+          defaultName,
+          'weekly_meal_plan',
+          plan,
+          parsedForDB
+        )
+        console.log('Meal plan saved successfully:', saveResult)
+      } catch (saveError: any) {
+        console.warn('Failed to save meal plan, but keeping it displayed:', saveError)
+        // Don't reset the meal plan if saving fails
+        // Check if this is a database table missing error
+        if (saveError?.code === '42P01') {
+          console.warn('Database table missing - meal plan will remain visible but not saved')
+        }
+      }
     } catch (error) {
+      console.error('Error generating meal plan:', error)
       setMealPlan('Sorry, I encountered an error generating your meal plan. Please try again.')
       setParsedMealPlan(null)
     } finally {
       setLoading(false)
+      // Reset the flag after a delay to allow normal loading later
+      setTimeout(() => setJustGeneratedPlan(false), 5000)
     }
   }
 
@@ -233,32 +299,6 @@ export function MealPlanner({ profile }: MealPlannerProps) {
     }
   }
 
-  const handleSavePlan = async () => {
-    if (!planName.trim()) return
-    
-    setSaving(true)
-    try {
-      const planType = activeTab === 'meal-plan' ? 'weekly_meal_plan' : 'nutrition_strategy'
-      const content = activeTab === 'meal-plan' ? mealPlan : nutritionRecommendations
-      const parsed = activeTab === 'meal-plan' ? parsedMealPlan : undefined
-      
-      await saveMealPlanToDatabase(
-        profile.user_id,
-        planName,
-        planType,
-        content,
-        parsed
-      )
-      
-      setShowSaveDialog(false)
-      setPlanName('')
-    } catch (error) {
-      console.error('Error saving plan:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleLoadPlan = async (plan: SavedMealPlan) => {
     try {
       await setActiveMealPlan(plan.id, profile.user_id, plan.plan_type)
@@ -266,7 +306,18 @@ export function MealPlanner({ profile }: MealPlannerProps) {
       if (plan.plan_type === 'weekly_meal_plan') {
         setMealPlan(plan.plan_content)
         if (plan.parsed_data && Object.keys(plan.parsed_data).length > 0) {
-          setParsedMealPlan(plan.parsed_data)
+          // Reassign icons to meals when loading from database
+          const parsedWithIcons = {
+            ...plan.parsed_data,
+            days: plan.parsed_data.days?.map((day: any) => ({
+              ...day,
+              meals: day.meals?.map((meal: any) => ({
+                ...meal,
+                icon: assignMealIcon(meal.type)
+              }))
+            }))
+          }
+          setParsedMealPlan(parsedWithIcons)
         } else {
           const parsed = parseMealPlan(plan.plan_content)
           setParsedMealPlan(parsed)
@@ -319,16 +370,6 @@ export function MealPlanner({ profile }: MealPlannerProps) {
               <History className="w-4 h-4 mr-2" />
               History
             </button>
-            
-            {((activeTab === 'meal-plan' && mealPlan) || (activeTab === 'recommendations' && nutritionRecommendations)) && (
-              <button
-                onClick={() => setShowSaveDialog(true)}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium transition-colors duration-200 flex items-center"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </button>
-            )}
           </div>
         </div>
 
@@ -460,6 +501,8 @@ export function MealPlanner({ profile }: MealPlannerProps) {
         </div>
       )}
 
+
+
       {/* Day Cards Display */}
       {parsedMealPlan?.days && parsedMealPlan.days.length > 0 && (
         <div className="space-y-6">
@@ -489,7 +532,8 @@ export function MealPlanner({ profile }: MealPlannerProps) {
 
                 <div className="space-y-4">
                   {day.meals.map((meal, mealIndex) => {
-                    const IconComponent = meal.icon
+                    // Ensure we have a valid icon component
+                    const IconComponent: LucideIcon = meal.icon || Apple
                     return (
                       <div key={mealIndex} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
                         <div className="flex items-start">
@@ -559,61 +603,6 @@ export function MealPlanner({ profile }: MealPlannerProps) {
         </div>
       )}
 
-      {/* Save Dialog */}
-      {showSaveDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Save {activeTab === 'meal-plan' ? 'Meal Plan' : 'Nutrition Strategy'}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Plan Name
-                </label>
-                <input
-                  type="text"
-                  value={planName}
-                  onChange={(e) => setPlanName(e.target.value)}
-                  placeholder={`My ${activeTab === 'meal-plan' ? 'Meal Plan' : 'Nutrition Strategy'}`}
-                  className="w-full px-4 py-3 bg-white/20 border border-white/10 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent dark:text-white placeholder-gray-500"
-                />
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleSavePlan}
-                  disabled={saving || !planName.trim()}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-xl font-semibold hover:from-green-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
-                >
-                  {saving ? (
-                    <>
-                      <Loader className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowSaveDialog(false)
-                    setPlanName('')
-                  }}
-                  className="flex-1 bg-white/10 text-gray-700 dark:text-gray-300 py-3 rounded-xl font-semibold hover:bg-white/20 transition-all duration-200 flex items-center justify-center"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* History Dialog */}
       {showHistoryDialog && (
