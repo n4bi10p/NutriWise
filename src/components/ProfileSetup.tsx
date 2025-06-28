@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase, saveUserPreferences } from '../lib/supabase'
+import DatabaseSetup from './DatabaseSetup'
 import { 
   User, Target, Utensils, Globe, Calculator, AlertCircle, 
   Heart, Activity, Moon, Droplets, FileText, Shield,
   Zap, Coffee, Sparkles, TrendingUp, TrendingDown, 
-  Minus, Plus, Dumbbell, Scale
+  Minus, Dumbbell, Scale
 } from 'lucide-react'
 
 interface ProfileSetupProps {
@@ -14,6 +15,7 @@ interface ProfileSetupProps {
 }
 
 export function ProfileSetup({ userId, onProfileComplete, error: propError }: ProfileSetupProps) {
+  const [showDatabaseSetup, setShowDatabaseSetup] = useState(false)
   const [formData, setFormData] = useState({
     full_name: '',
     age: '',
@@ -35,6 +37,13 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(propError || '')
+
+  // Check if we need to show database setup modal
+  useEffect(() => {
+    if (propError && propError.includes('Database setup required')) {
+      setShowDatabaseSetup(true)
+    }
+  }, [propError])
 
   const dietaryOptions = [
     'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low-Carb', 
@@ -144,6 +153,18 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
     try {
       console.log('Creating profile for user:', userId)
       
+      // Map new goal values to supported database values temporarily
+      const goalMapping: Record<string, string> = {
+        'weight_loss': 'weight_loss',
+        'muscle_gain': 'muscle_gain', 
+        'maintenance': 'maintenance',
+        'fat_loss_muscle_gain': 'maintenance', // Temporary mapping
+        'athletic_performance': 'muscle_gain', // Temporary mapping
+        'general_health': 'maintenance' // Temporary mapping
+      }
+      
+      const mappedGoal = goalMapping[formData.goal] || 'maintenance'
+      
       // Create basic profile data (no complex JSON)
       const basicProfileData = {
         user_id: userId,
@@ -152,7 +173,7 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
         gender: formData.gender,
         height: parseInt(formData.height),
         weight: parseInt(formData.weight),
-        goal: formData.goal,
+        goal: mappedGoal, // Use mapped goal value
         activity_level: formData.activity_level,
         sleep_hours: parseInt(formData.sleep_hours),
         water_goal_ltr: parseFloat(formData.water_goal_ltr),
@@ -169,21 +190,41 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
 
       console.log('Basic profile data:', basicProfileData)
 
-      // Insert basic profile first
-      const { data: profile, error: profileError } = await supabase
+      // Try to insert basic profile first, if it fails due to duplicate, update instead
+      let profile
+      const { data: insertedProfile, error: profileError } = await supabase
         .from('profiles')
         .insert(basicProfileData)
         .select()
         .single()
 
       if (profileError) {
-        console.error('Profile creation error:', profileError)
-        throw profileError
+        if (profileError.code === '23505') {
+          // Profile already exists, update it instead
+          console.log('Profile already exists, updating...')
+          const { data: updatedProfile, error: updateError } = await supabase
+            .from('profiles')
+            .update(basicProfileData)
+            .eq('user_id', userId)
+            .select()
+            .single()
+          
+          if (updateError) {
+            console.error('Profile update error:', updateError)
+            throw updateError
+          }
+          profile = updatedProfile
+        } else {
+          console.error('Profile creation error:', profileError)
+          throw profileError
+        }
+      } else {
+        profile = insertedProfile
       }
 
       console.log('Profile created successfully:', profile)
 
-      // Save preferences separately
+      // Save preferences separately (including original goal)
       const preferences = {
         dietary_restrictions: formData.dietary_restrictions,
         allergies: formData.allergies,
@@ -191,15 +232,68 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
         food_preferences: formData.food_preferences,
         regional_preference: formData.regional_preference
       }
-
+      
       console.log('Saving preferences:', preferences)
       await saveUserPreferences(userId, preferences)
+      
+      // Save original goal as a separate preference entry if it was mapped
+      if (formData.goal !== mappedGoal) {
+        console.log('Saving original goal as preference:', formData.goal)
+        try {
+          // Insert the original goal directly into user_preferences table
+          const { error: goalError } = await supabase
+            .from('user_preferences')
+            .insert({
+              user_id: userId,
+              preference_type: 'original_goal',
+              preference_value: formData.goal
+            })
+          
+          if (goalError) {
+            console.warn('Could not save original goal preference:', goalError)
+          }
+        } catch (goalErr) {
+          console.warn('user_preferences table may not exist yet:', goalErr)
+        }
+      }
 
       console.log('Preferences saved successfully')
       onProfileComplete()
     } catch (error: any) {
       console.error('Error creating profile:', error)
-      setError(error.message || 'Failed to create profile. Please try again.')
+      
+      // Handle different types of errors
+      let errorMessage = 'Failed to create profile. Please try again.'
+      
+      if (error?.code === '42P01') {
+        // Table doesn't exist
+        setShowDatabaseSetup(true)
+        errorMessage = 'Database tables are not set up properly. Please follow the setup instructions.'
+      } else if (error?.code === '23514') {
+        // Check constraint violation
+        if (error?.message?.includes('goal')) {
+          errorMessage = 'Invalid goal selected. Please contact support to update the database constraints.'
+        } else if (error?.message?.includes('age')) {
+          errorMessage = 'Please enter a valid age between 1 and 149.'
+        } else if (error?.message?.includes('height')) {
+          errorMessage = 'Please enter a valid height between 1 and 299 cm.'
+        } else if (error?.message?.includes('weight')) {
+          errorMessage = 'Please enter a valid weight between 1 and 499 kg.'
+        } else {
+          errorMessage = 'Invalid data provided. Please check your inputs and try again.'
+        }
+      } else if (error?.code === '23505') {
+        // Unique constraint violation - this shouldn't happen now since we handle it
+        errorMessage = 'Profile updated successfully, but there was an issue with preferences. Please try again.'
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error?.details) {
+        errorMessage = error.details
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -607,9 +701,22 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start shadow-lg">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
-                <p className="text-red-600">{error}</p>
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-lg">
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+                  <div className="flex-grow">
+                    <p className="text-red-600 mb-3">{error}</p>
+                    {error.includes('Database setup required') && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDatabaseSetup(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        Show Setup Instructions
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -633,6 +740,10 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
           </form>
         </div>
       </div>
+      
+      {showDatabaseSetup && (
+        <DatabaseSetup onClose={() => setShowDatabaseSetup(false)} />
+      )}
     </div>
   )
 }

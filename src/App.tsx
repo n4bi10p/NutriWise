@@ -98,9 +98,15 @@ function App() {
         console.log('No profile found, going to setup')
         setAppState('profile-setup')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking profile:', error)
-      setError('Failed to load profile data.')
+      
+      // Check if it's a missing table error
+      if (error?.code === '42P01') {
+        setError('Database setup required. Please run the migration script.')
+      } else {
+        setError('Failed to load profile data.')
+      }
       setAppState('profile-setup')
     }
   }

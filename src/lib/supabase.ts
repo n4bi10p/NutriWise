@@ -207,7 +207,19 @@ export const getUserPreferences = async (userId: string): Promise<{
     .select('preference_type, preference_value')
     .eq('user_id', userId)
 
-  if (error) throw error
+  if (error) {
+    // If table doesn't exist, return empty preferences instead of throwing
+    if (error.code === '42P01') {
+      return {
+        dietary_restrictions: [],
+        allergies: [],
+        health_conditions: [],
+        food_preferences: [],
+        regional_preference: ''
+      }
+    }
+    throw error
+  }
 
   const preferences = {
     dietary_restrictions: [] as string[],
@@ -251,14 +263,15 @@ export const saveUserPreferences = async (
     regional_preference?: string
   }
 ) => {
-  // Delete existing preferences for this user
-  await supabase
-    .from('user_preferences')
-    .delete()
-    .eq('user_id', userId)
+  try {
+    // Delete existing preferences for this user
+    await supabase
+      .from('user_preferences')
+      .delete()
+      .eq('user_id', userId)
 
-  // Insert new preferences
-  const preferencesToInsert: Omit<UserPreference, 'id' | 'created_at'>[] = []
+    // Insert new preferences
+    const preferencesToInsert: Omit<UserPreference, 'id' | 'created_at'>[] = []
 
   if (preferences.dietary_restrictions) {
     preferences.dietary_restrictions.forEach(value => {
@@ -323,6 +336,14 @@ export const saveUserPreferences = async (
 
     if (error) throw error
   }
+  } catch (error: any) {
+    // If user_preferences table doesn't exist, log warning but don't fail
+    if (error?.code === '42P01') {
+      console.warn('user_preferences table does not exist. Please run migrations first.')
+    } else {
+      throw error
+    }
+  }
 }
 
 // Helper function to get complete profile with preferences
@@ -337,8 +358,25 @@ export const getCompleteProfile = async (userId: string): Promise<Profile | null
   if (profileError) throw profileError
   if (!profile) return null
 
-  // Get preferences
-  const preferences = await getUserPreferences(userId)
+  // Get preferences (with error handling for missing table)
+  let preferences = {
+    dietary_restrictions: [] as string[],
+    allergies: [] as string[],
+    health_conditions: [] as string[],
+    food_preferences: [] as string[],
+    regional_preference: ''
+  }
+
+  try {
+    preferences = await getUserPreferences(userId)
+  } catch (error: any) {
+    // If user_preferences table doesn't exist, use empty preferences
+    if (error?.code === '42P01') {
+      console.warn('user_preferences table does not exist. Using empty preferences.')
+    } else {
+      console.warn('Error fetching preferences:', error)
+    }
+  }
 
   return {
     ...profile,
@@ -465,59 +503,101 @@ export const saveMealPlanToDatabase = async (
   planContent: string,
   parsedData?: any
 ) => {
-  // First, deactivate any existing active plans of the same type
-  await supabase
-    .from('saved_meal_plans')
-    .update({ is_active: false })
-    .eq('user_id', userId)
-    .eq('plan_type', planType)
+  try {
+    // First, deactivate any existing active plans of the same type
+    await supabase
+      .from('saved_meal_plans')
+      .update({ is_active: false })
+      .eq('user_id', userId)
+      .eq('plan_type', planType)
 
-  // Save the new plan as active
-  const { data, error } = await supabase
-    .from('saved_meal_plans')
-    .insert({
-      user_id: userId,
-      name,
-      plan_type: planType,
-      plan_content: planContent,
-      parsed_data: parsedData || {},
-      is_active: true
-    })
-    .select()
-    .single()
+    // Save the new plan as active
+    const { data, error } = await supabase
+      .from('saved_meal_plans')
+      .insert({
+        user_id: userId,
+        name,
+        plan_type: planType,
+        plan_content: planContent,
+        parsed_data: parsedData || {},
+        is_active: true
+      })
+      .select()
+      .single()
 
-  if (error) throw error
-  return data
+    if (error) {
+      if (error.code === '42P01') {
+        console.warn('saved_meal_plans table does not exist. Please run migrations first.')
+        return null
+      }
+      throw error
+    }
+    return data
+  } catch (error: any) {
+    if (error?.code === '42P01') {
+      console.warn('saved_meal_plans table does not exist. Please run migrations first.')
+      return null
+    }
+    throw error
+  }
 }
 
 export const getActiveMealPlan = async (userId: string, planType: 'weekly_meal_plan' | 'nutrition_strategy') => {
-  const { data, error } = await supabase
-    .from('saved_meal_plans')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('plan_type', planType)
-    .eq('is_active', true)
-    .maybeSingle()
+  try {
+    const { data, error } = await supabase
+      .from('saved_meal_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('plan_type', planType)
+      .eq('is_active', true)
+      .maybeSingle()
 
-  if (error) throw error
-  return data
+    if (error) {
+      if (error.code === '42P01') {
+        console.warn('saved_meal_plans table does not exist. Please run migrations first.')
+        return null
+      }
+      throw error
+    }
+    return data
+  } catch (error: any) {
+    if (error?.code === '42P01') {
+      console.warn('saved_meal_plans table does not exist. Please run migrations first.')
+      return null
+    }
+    throw error
+  }
 }
 
 export const getUserMealPlans = async (userId: string, planType?: 'weekly_meal_plan' | 'nutrition_strategy') => {
-  let query = supabase
-    .from('saved_meal_plans')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+  try {
+    let query = supabase
+      .from('saved_meal_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
 
-  if (planType) {
-    query = query.eq('plan_type', planType)
+    if (planType) {
+      query = query.eq('plan_type', planType)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      if (error.code === '42P01') {
+        console.warn('saved_meal_plans table does not exist. Please run migrations first.')
+        return []
+      }
+      throw error
+    }
+    return data
+  } catch (error: any) {
+    if (error?.code === '42P01') {
+      console.warn('saved_meal_plans table does not exist. Please run migrations first.')
+      return []
+    }
+    throw error
   }
-
-  const { data, error } = await query
-
-  if (error) throw error
-  return data
 }
 
 export const deleteMealPlan = async (planId: string) => {

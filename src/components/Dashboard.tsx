@@ -12,6 +12,7 @@ import { ProgressTracker } from './ProgressTracker'
 import { Settings } from './Settings'
 import { Achievements } from './Achievements'
 import { CommunityRecipes } from './CommunityRecipes'
+import DatabaseWarning from './DatabaseWarning'
 
 interface DashboardProps {
   user: any
@@ -25,6 +26,7 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
   const [theme, setTheme] = useState<'light' | 'dark'>(initialProfile.theme)
   const [showSettings, setShowSettings] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [showDatabaseWarning, setShowDatabaseWarning] = useState(true) // Show by default
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -238,6 +240,9 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
 
         {/* Main Content */}
         <div className="flex-1 p-6">
+          {showDatabaseWarning && (
+            <DatabaseWarning onDismiss={() => setShowDatabaseWarning(false)} />
+          )}
           {renderActiveTab()}
         </div>
       </div>
