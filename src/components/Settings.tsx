@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase, Profile, PROFILE_COLUMNS } from '../lib/supabase'
+import { supabase, Profile } from '../lib/supabase'
 import { 
   Settings as SettingsIcon, User, Bell, Shield, Palette, 
   Save, Moon, Sun, Check, X, AlertCircle 
@@ -37,19 +37,28 @@ export function Settings({ user, profile, onProfileUpdate, onClose }: SettingsPr
     setMessage('')
 
     try {
-      const { data, error } = await supabase
+      // Use simple update without complex selects
+      const { error: updateError } = await supabase
         .from('profiles')
         .update(profileData)
         .eq('user_id', user.id)
-        .select(PROFILE_COLUMNS)
+
+      if (updateError) throw updateError
+
+      // Fetch updated profile separately with minimal columns
+      const { data, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id,user_id,full_name,age,gender,height,weight,goal,preferences,allergies,health_conditions,food_preferences,activity_level,sleep_hours,water_goal_ltr,notes,calorie_target,protein_target,theme,points,level,streak_days,last_login,notification_preferences,created_at')
+        .eq('user_id', user.id)
         .single()
 
-      if (error) throw error
+      if (fetchError) throw fetchError
 
       onProfileUpdate(data)
       setMessage('Profile updated successfully!')
     } catch (error: any) {
-      setError(error.message)
+      console.error('Profile update error:', error)
+      setError(error.message || 'Failed to update profile')
     } finally {
       setLoading(false)
     }
@@ -61,19 +70,21 @@ export function Settings({ user, profile, onProfileUpdate, onClose }: SettingsPr
     setMessage('')
 
     try {
-      const { data, error } = await supabase
+      // Use simple update
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ notification_preferences: notificationPrefs })
         .eq('user_id', user.id)
-        .select(PROFILE_COLUMNS)
-        .single()
 
-      if (error) throw error
+      if (updateError) throw updateError
 
-      onProfileUpdate(data)
+      // Update local profile
+      const updatedProfile = { ...profile, notification_preferences: notificationPrefs }
+      onProfileUpdate(updatedProfile)
       setMessage('Notification preferences updated!')
     } catch (error: any) {
-      setError(error.message)
+      console.error('Notification update error:', error)
+      setError(error.message || 'Failed to update notifications')
     } finally {
       setLoading(false)
     }
@@ -85,20 +96,22 @@ export function Settings({ user, profile, onProfileUpdate, onClose }: SettingsPr
     setMessage('')
 
     try {
-      const { data, error } = await supabase
+      // Use simple update
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ theme })
         .eq('user_id', user.id)
-        .select(PROFILE_COLUMNS)
-        .single()
 
-      if (error) throw error
+      if (updateError) throw updateError
 
-      onProfileUpdate(data)
+      // Update local profile and DOM
+      const updatedProfile = { ...profile, theme }
+      onProfileUpdate(updatedProfile)
       document.documentElement.classList.toggle('dark', theme === 'dark')
       setMessage('Theme updated successfully!')
     } catch (error: any) {
-      setError(error.message)
+      console.error('Theme update error:', error)
+      setError(error.message || 'Failed to update theme')
     } finally {
       setLoading(false)
     }

@@ -24,30 +24,43 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [theme, setTheme] = useState<'light' | 'dark'>(initialProfile.theme)
   const [showSettings, setShowSettings] = useState(false)
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     
-    // Update last login on dashboard load
+    // Update last login on dashboard load (fire and forget)
     updateLastLogin(user.id).catch(console.error)
   }, [theme, user.id])
 
   const toggleTheme = async () => {
+    if (updating) return // Prevent multiple simultaneous updates
+    
     const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
+    setTheme(newTheme) // Update UI immediately
+    setUpdating(true)
     
     try {
-      const { data, error } = await supabase
+      // Use a simple update without complex selects
+      const { error } = await supabase
         .from('profiles')
         .update({ theme: newTheme })
         .eq('user_id', user.id)
-        .select()
-        .single()
 
-      if (error) throw error
-      setProfile(data)
+      if (error) {
+        console.error('Theme update error:', error)
+        // Revert theme on error
+        setTheme(theme)
+      } else {
+        // Update local profile state
+        setProfile(prev => ({ ...prev, theme: newTheme }))
+      }
     } catch (error) {
       console.error('Error updating theme:', error)
+      // Revert theme on error
+      setTheme(theme)
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -127,7 +140,8 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
               
               <button
                 onClick={toggleTheme}
-                className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors duration-200"
+                disabled={updating}
+                className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors duration-200 disabled:opacity-50"
               >
                 {theme === 'light' ? (
                   <Moon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
