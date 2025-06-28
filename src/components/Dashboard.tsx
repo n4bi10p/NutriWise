@@ -26,7 +26,7 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
   const [theme, setTheme] = useState<'light' | 'dark'>(initialProfile.theme)
   const [showSettings, setShowSettings] = useState(false)
   const [updating, setUpdating] = useState(false)
-  const [showDatabaseWarning, setShowDatabaseWarning] = useState(true) // Show by default
+  const [showDatabaseWarning, setShowDatabaseWarning] = useState(false) // Database is working, no need to show warning
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
