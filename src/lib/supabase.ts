@@ -9,9 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Explicitly define profile columns to avoid stack depth issues with SELECT *
-export const PROFILE_COLUMNS = `id,user_id,full_name,age,gender,height,weight,goal,preferences,allergies,health_conditions,food_preferences,activity_level,sleep_hours,water_goal_ltr,notes,calorie_target,protein_target,theme,points,level,streak_days,last_login,notification_preferences,created_at`
-
+// Simplified profile type without complex nested objects
 export type Profile = {
   id: string
   user_id: string
@@ -21,13 +19,6 @@ export type Profile = {
   height: number
   weight: number
   goal: 'weight_loss' | 'muscle_gain' | 'maintenance' | 'fat_loss_muscle_gain' | 'athletic_performance' | 'general_health'
-  preferences: {
-    dietary_restrictions: string[]
-    regional_preference: string
-  }
-  allergies: string[]
-  health_conditions: string[]
-  food_preferences: string[]
   activity_level: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active'
   sleep_hours: number
   water_goal_ltr: number
@@ -45,6 +36,32 @@ export type Profile = {
     community_updates: boolean
   }
   created_at: string
+  // Virtual fields populated from user_preferences table
+  dietary_restrictions?: string[]
+  allergies?: string[]
+  health_conditions?: string[]
+  food_preferences?: string[]
+  regional_preference?: string
+}
+
+export type UserPreference = {
+  id: string
+  user_id: string
+  preference_type: 'dietary_restriction' | 'allergy' | 'health_condition' | 'food_preference' | 'regional_preference'
+  preference_value: string
+  created_at: string
+}
+
+export type SavedMealPlan = {
+  id: string
+  user_id: string
+  name: string
+  plan_type: 'weekly_meal_plan' | 'nutrition_strategy'
+  plan_content: string
+  parsed_data: any
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }
 
 export type ChatMessage = {
@@ -155,18 +172,6 @@ export type MealPlan = {
   updated_at: string
 }
 
-export type SavedMealPlan = {
-  id: string
-  user_id: string
-  name: string
-  plan_type: 'weekly_meal_plan' | 'nutrition_strategy'
-  plan_content: string
-  parsed_data: any
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
 export type UserStreak = {
   id: string
   user_id: string
@@ -187,6 +192,158 @@ export type Notification = {
   is_read: boolean
   action_url?: string
   created_at: string
+}
+
+// Helper function to get user preferences
+export const getUserPreferences = async (userId: string): Promise<{
+  dietary_restrictions: string[]
+  allergies: string[]
+  health_conditions: string[]
+  food_preferences: string[]
+  regional_preference: string
+}> => {
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .select('preference_type, preference_value')
+    .eq('user_id', userId)
+
+  if (error) throw error
+
+  const preferences = {
+    dietary_restrictions: [] as string[],
+    allergies: [] as string[],
+    health_conditions: [] as string[],
+    food_preferences: [] as string[],
+    regional_preference: ''
+  }
+
+  data?.forEach(pref => {
+    switch (pref.preference_type) {
+      case 'dietary_restriction':
+        preferences.dietary_restrictions.push(pref.preference_value)
+        break
+      case 'allergy':
+        preferences.allergies.push(pref.preference_value)
+        break
+      case 'health_condition':
+        preferences.health_conditions.push(pref.preference_value)
+        break
+      case 'food_preference':
+        preferences.food_preferences.push(pref.preference_value)
+        break
+      case 'regional_preference':
+        preferences.regional_preference = pref.preference_value
+        break
+    }
+  })
+
+  return preferences
+}
+
+// Helper function to save user preferences
+export const saveUserPreferences = async (
+  userId: string,
+  preferences: {
+    dietary_restrictions?: string[]
+    allergies?: string[]
+    health_conditions?: string[]
+    food_preferences?: string[]
+    regional_preference?: string
+  }
+) => {
+  // Delete existing preferences for this user
+  await supabase
+    .from('user_preferences')
+    .delete()
+    .eq('user_id', userId)
+
+  // Insert new preferences
+  const preferencesToInsert: Omit<UserPreference, 'id' | 'created_at'>[] = []
+
+  if (preferences.dietary_restrictions) {
+    preferences.dietary_restrictions.forEach(value => {
+      if (value.trim()) {
+        preferencesToInsert.push({
+          user_id: userId,
+          preference_type: 'dietary_restriction',
+          preference_value: value
+        })
+      }
+    })
+  }
+
+  if (preferences.allergies) {
+    preferences.allergies.forEach(value => {
+      if (value.trim()) {
+        preferencesToInsert.push({
+          user_id: userId,
+          preference_type: 'allergy',
+          preference_value: value
+        })
+      }
+    })
+  }
+
+  if (preferences.health_conditions) {
+    preferences.health_conditions.forEach(value => {
+      if (value.trim()) {
+        preferencesToInsert.push({
+          user_id: userId,
+          preference_type: 'health_condition',
+          preference_value: value
+        })
+      }
+    })
+  }
+
+  if (preferences.food_preferences) {
+    preferences.food_preferences.forEach(value => {
+      if (value.trim()) {
+        preferencesToInsert.push({
+          user_id: userId,
+          preference_type: 'food_preference',
+          preference_value: value
+        })
+      }
+    })
+  }
+
+  if (preferences.regional_preference && preferences.regional_preference.trim()) {
+    preferencesToInsert.push({
+      user_id: userId,
+      preference_type: 'regional_preference',
+      preference_value: preferences.regional_preference
+    })
+  }
+
+  if (preferencesToInsert.length > 0) {
+    const { error } = await supabase
+      .from('user_preferences')
+      .insert(preferencesToInsert)
+
+    if (error) throw error
+  }
+}
+
+// Helper function to get complete profile with preferences
+export const getCompleteProfile = async (userId: string): Promise<Profile | null> => {
+  // Get basic profile
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id,user_id,full_name,age,gender,height,weight,goal,activity_level,sleep_hours,water_goal_ltr,notes,calorie_target,protein_target,theme,points,level,streak_days,last_login,notification_preferences,created_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (profileError) throw profileError
+  if (!profile) return null
+
+  // Get preferences
+  const preferences = await getUserPreferences(userId)
+
+  return {
+    ...profile,
+    ...preferences
+  }
 }
 
 // Helper functions

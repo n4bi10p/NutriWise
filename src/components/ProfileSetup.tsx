@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, saveUserPreferences } from '../lib/supabase'
 import { 
   User, Target, Utensils, Globe, Calculator, AlertCircle, 
   Heart, Activity, Moon, Droplets, FileText, Shield,
@@ -142,9 +142,10 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
     setError('')
 
     try {
-      console.log('Creating comprehensive profile for user:', userId)
+      console.log('Creating profile for user:', userId)
       
-      const profileData = {
+      // Create basic profile data (no complex JSON)
+      const basicProfileData = {
         user_id: userId,
         full_name: formData.full_name,
         age: parseInt(formData.age),
@@ -152,36 +153,49 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
         height: parseInt(formData.height),
         weight: parseInt(formData.weight),
         goal: formData.goal,
-        preferences: {
-          dietary_restrictions: formData.dietary_restrictions,
-          regional_preference: formData.regional_preference
-        },
-        allergies: formData.allergies,
-        health_conditions: formData.health_conditions,
-        food_preferences: formData.food_preferences,
         activity_level: formData.activity_level,
         sleep_hours: parseInt(formData.sleep_hours),
         water_goal_ltr: parseFloat(formData.water_goal_ltr),
         notes: formData.notes,
         calorie_target: parseInt(formData.calorie_target),
         protein_target: parseInt(formData.protein_target),
-        theme: 'light'
+        theme: 'light' as const,
+        notification_preferences: {
+          daily_reminders: true,
+          achievement_alerts: true,
+          community_updates: false
+        }
       }
 
-      console.log('Profile data:', profileData)
+      console.log('Basic profile data:', basicProfileData)
 
-      const { data, error } = await supabase
+      // Insert basic profile first
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .insert(profileData)
+        .insert(basicProfileData)
         .select()
         .single()
 
-      if (error) {
-        console.error('Profile creation error:', error)
-        throw error
+      if (profileError) {
+        console.error('Profile creation error:', profileError)
+        throw profileError
       }
 
-      console.log('Profile created successfully:', data)
+      console.log('Profile created successfully:', profile)
+
+      // Save preferences separately
+      const preferences = {
+        dietary_restrictions: formData.dietary_restrictions,
+        allergies: formData.allergies,
+        health_conditions: formData.health_conditions,
+        food_preferences: formData.food_preferences,
+        regional_preference: formData.regional_preference
+      }
+
+      console.log('Saving preferences:', preferences)
+      await saveUserPreferences(userId, preferences)
+
+      console.log('Preferences saved successfully')
       onProfileComplete()
     } catch (error: any) {
       console.error('Error creating profile:', error)

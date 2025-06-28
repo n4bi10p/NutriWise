@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Profile } from '../lib/supabase'
+import { Profile, getUserPreferences } from '../lib/supabase'
 import { chatWithGemini } from '../lib/gemini'
 import { Send, Bot, User, Loader, Sparkles } from 'lucide-react'
 
@@ -24,7 +24,7 @@ export function ChatAssistant({ profile }: ChatAssistantProps) {
 🍽️ Personalized meal planning based on your ${profile.goal.replace('_', ' ')} goals
 🥗 Dietary advice considering your preferences and restrictions
 🏃‍♂️ Nutrition for your ${profile.activity_level.replace('_', ' ')} lifestyle
-🌍 Regional cuisine recommendations from ${profile.preferences?.regional_preference || 'various cultures'}
+🌍 Regional cuisine recommendations
 📊 Macro tracking to hit your ${profile.calorie_target} cal, ${profile.protein_target}g protein targets
 
 What would you like to know about nutrition and health today?`,
@@ -33,7 +33,32 @@ What would you like to know about nutrition and health today?`,
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [enrichedProfile, setEnrichedProfile] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Load user preferences to enrich the profile for AI context
+    const loadPreferences = async () => {
+      try {
+        const preferences = await getUserPreferences(profile.user_id)
+        setEnrichedProfile({
+          ...profile,
+          preferences: {
+            dietary_restrictions: preferences.dietary_restrictions,
+            regional_preference: preferences.regional_preference
+          },
+          allergies: preferences.allergies,
+          health_conditions: preferences.health_conditions,
+          food_preferences: preferences.food_preferences
+        })
+      } catch (error) {
+        console.error('Error loading preferences:', error)
+        setEnrichedProfile(profile)
+      }
+    }
+
+    loadPreferences()
+  }, [profile])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -45,7 +70,7 @@ What would you like to know about nutrition and health today?`,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || loading) return
+    if (!input.trim() || loading || !enrichedProfile) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -59,7 +84,7 @@ What would you like to know about nutrition and health today?`,
     setLoading(true)
 
     try {
-      const aiResponse = await chatWithGemini(input, profile)
+      const aiResponse = await chatWithGemini(input, enrichedProfile)
       // Remove bold formatting from AI responses
       const cleanResponse = aiResponse.replace(/\*\*(.*?)\*\*/g, '$1')
       

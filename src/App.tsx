@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase, Profile, PROFILE_COLUMNS } from './lib/supabase'
+import { supabase, getCompleteProfile, Profile } from './lib/supabase'
 import { AuthForm } from './components/AuthForm'
 import { ProfileSetup } from './components/ProfileSetup'
 import { Dashboard } from './components/Dashboard'
@@ -87,22 +87,12 @@ function App() {
       console.log('Checking profile for user:', userId)
       setAppState('loading')
       
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select(PROFILE_COLUMNS)
-        .eq('user_id', userId)
-        .maybeSingle()
+      // Use the new normalized profile fetching function
+      const completeProfile = await getCompleteProfile(userId)
 
-      if (error) {
-        console.error('Profile fetch error:', error)
-        setError('Failed to load profile. Please try again.')
-        setAppState('profile-setup')
-        return
-      }
-
-      if (profile) {
+      if (completeProfile) {
         console.log('Profile found, going to dashboard')
-        setProfile(profile)
+        setProfile(completeProfile)
         setAppState('dashboard')
       } else {
         console.log('No profile found, going to setup')
