@@ -10,33 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Explicitly define profile columns to avoid stack depth issues with SELECT *
-export const PROFILE_COLUMNS = `
-  id,
-  user_id,
-  full_name,
-  age,
-  gender,
-  height,
-  weight,
-  goal,
-  preferences,
-  allergies,
-  health_conditions,
-  food_preferences,
-  activity_level,
-  sleep_hours,
-  water_goal_ltr,
-  notes,
-  calorie_target,
-  protein_target,
-  theme,
-  points,
-  level,
-  streak_days,
-  last_login,
-  notification_preferences,
-  created_at
-`
+export const PROFILE_COLUMNS = `id,user_id,full_name,age,gender,height,weight,goal,preferences,allergies,health_conditions,food_preferences,activity_level,sleep_hours,water_goal_ltr,notes,calorie_target,protein_target,theme,points,level,streak_days,last_login,notification_preferences,created_at`
 
 export type Profile = {
   id: string
