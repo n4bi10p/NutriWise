@@ -19,13 +19,13 @@ export function ChatAssistant({ profile }: ChatAssistantProps) {
     {
       id: '1',
       type: 'ai',
-      content: `Hi ${profile.full_name}! 👋 I'm your AI nutrition assistant powered by Gemini 1.5 Flash. I can help you with:
+      content: `Hi ${profile.full_name}! 👋 I'm your nutrition assistant. I can help you with:
 
-🍽️ **Personalized meal planning** based on your ${profile.goal.replace('_', ' ')} goals
-🥗 **Dietary advice** considering your preferences and restrictions
-🏃‍♂️ **Nutrition for your ${profile.activity_level.replace('_', ' ')} lifestyle**
-🌍 **Regional cuisine recommendations** from ${profile.preferences?.regional_preference || 'various cultures'}
-📊 **Macro tracking** to hit your ${profile.calorie_target} cal, ${profile.protein_target}g protein targets
+🍽️ Personalized meal planning based on your ${profile.goal.replace('_', ' ')} goals
+🥗 Dietary advice considering your preferences and restrictions
+🏃‍♂️ Nutrition for your ${profile.activity_level.replace('_', ' ')} lifestyle
+🌍 Regional cuisine recommendations from ${profile.preferences?.regional_preference || 'various cultures'}
+📊 Macro tracking to hit your ${profile.calorie_target} cal, ${profile.protein_target}g protein targets
 
 What would you like to know about nutrition and health today?`,
       timestamp: new Date()
@@ -60,10 +60,13 @@ What would you like to know about nutrition and health today?`,
 
     try {
       const aiResponse = await chatWithGemini(input, profile)
+      // Remove bold formatting from AI responses
+      const cleanResponse = aiResponse.replace(/\*\*(.*?)\*\*/g, '$1')
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: aiResponse,
+        content: cleanResponse,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiMessage])
@@ -71,7 +74,7 @@ What would you like to know about nutrition and health today?`,
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: 'Sorry, I encountered an error. Please check your Gemini API key configuration and try again.',
+        content: 'Sorry, I encountered an error. Please check your API key configuration and try again.',
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
@@ -101,8 +104,8 @@ What would you like to know about nutrition and health today?`,
             <Sparkles className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">AI Nutrition Assistant</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Powered by Gemini 1.5 Flash • Personalized for you</p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nutrition Assistant</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">Your personalized nutrition companion</p>
           </div>
         </div>
       </div>
@@ -154,7 +157,7 @@ What would you like to know about nutrition and health today?`,
                 <Loader className="w-4 h-4 text-white animate-spin" />
               </div>
               <div className="bg-white/20 border border-white/10 px-4 py-3 rounded-2xl">
-                <p className="text-sm text-gray-900 dark:text-white">AI is thinking...</p>
+                <p className="text-sm text-gray-900 dark:text-white">Assistant is thinking...</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Analyzing your profile and generating response</p>
               </div>
             </div>

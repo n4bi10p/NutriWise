@@ -27,7 +27,7 @@ interface GeminiRequest {
 export async function callGeminiAPI(request: GeminiRequest): Promise<string> {
   if (!GEMINI_API_KEY) {
     console.error('Gemini API key not configured')
-    return 'Sorry, the AI service is not configured. Please add your Gemini API key to the .env file.'
+    return 'Sorry, the service is not configured. Please add your API key to the .env file.'
   }
 
   try {
@@ -41,7 +41,7 @@ export async function callGeminiAPI(request: GeminiRequest): Promise<string> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error('Gemini API error:', response.status, errorData)
+      console.error('API error:', response.status, errorData)
       throw new Error(`API request failed with status ${response.status}`)
     }
 
@@ -49,13 +49,13 @@ export async function callGeminiAPI(request: GeminiRequest): Promise<string> {
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
       console.error('Invalid response structure:', data)
-      throw new Error('Invalid response from AI service')
+      throw new Error('Invalid response from service')
     }
 
     return data.candidates[0].content.parts[0]?.text || 'Sorry, I couldn\'t generate a response.'
   } catch (error) {
-    console.error('Gemini API Error:', error)
-    return 'Sorry, I\'m having trouble connecting to the AI service. Please try again later.'
+    console.error('API Error:', error)
+    return 'Sorry, I\'m having trouble connecting to the service. Please try again later.'
   }
 }
 
@@ -81,7 +81,7 @@ export async function chatWithGemini(message: string, userProfile?: any): Promis
 
 User Question: ${message}
 
-Please provide helpful, personalized nutrition advice based on the user's profile. Keep responses concise, actionable, and friendly. Focus on practical advice that aligns with their goals and preferences. If they ask about specific foods or meals, consider their dietary restrictions, allergies, and regional preferences.`
+Please provide helpful, personalized nutrition advice based on the user's profile. Keep responses concise, actionable, and friendly. Focus on practical advice that aligns with their goals and preferences. If they ask about specific foods or meals, consider their dietary restrictions, allergies, and regional preferences. Do not use bold formatting with asterisks in your response.`
 
   const request: GeminiRequest = {
     contents: [
@@ -124,22 +124,22 @@ export async function generateMealPlan(userProfile: any): Promise<string> {
   5. Includes variety and balanced nutrition
   
   Format as:
-  **Day 1 - Monday**
-  🌅 **Breakfast:** [meal name] (~X calories, Yg protein)
+  Day 1 - Monday
+  🌅 Breakfast: [meal name] (~X calories, Yg protein)
   [Brief description and preparation tips]
   
-  🌞 **Lunch:** [meal name] (~X calories, Yg protein)
+  🌞 Lunch: [meal name] (~X calories, Yg protein)
   [Brief description and preparation tips]
   
-  🌙 **Dinner:** [meal name] (~X calories, Yg protein)
+  🌙 Dinner: [meal name] (~X calories, Yg protein)
   [Brief description and preparation tips]
   
-  🍎 **Snack:** [meal name] (~X calories, Yg protein)
+  🍎 Snack: [meal name] (~X calories, Yg protein)
   [Brief description]
   
-  **Daily Total:** ~X calories, Yg protein
+  Daily Total: ~X calories, Yg protein
   
-  Continue for all 7 days. Include shopping tips and meal prep suggestions at the end.`
+  Continue for all 7 days. Include shopping tips and meal prep suggestions at the end. Do not use bold formatting with asterisks in your response.`
 
   const request: GeminiRequest = {
     contents: [
@@ -162,7 +162,7 @@ export async function generateMealPlan(userProfile: any): Promise<string> {
 export async function analyzeMenu(menu: string, userProfile: any): Promise<string> {
   const prompt = `Analyze this restaurant menu for someone with these health goals and preferences:
   
-  **User Profile:**
+  User Profile:
   - Name: ${userProfile.full_name}
   - Goal: ${userProfile.goal.replace('_', ' ')}
   - Daily Targets: ${userProfile.calorie_target} calories, ${userProfile.protein_target}g protein
@@ -172,28 +172,28 @@ export async function analyzeMenu(menu: string, userProfile: any): Promise<strin
   - Health Conditions: ${userProfile.health_conditions?.join(', ') || 'None'}
   - Food Preferences: ${userProfile.food_preferences?.join(', ') || 'None'}
   
-  **Restaurant Menu:**
+  Restaurant Menu:
   ${menu}
   
   Please provide:
   
-  🌟 **TOP RECOMMENDATIONS (3-5 best options):**
+  🌟 TOP RECOMMENDATIONS (3-5 best options):
   For each recommended item, explain:
   - Why it fits their goals
   - Estimated calories and protein
   - Nutritional benefits
   - Any suggested modifications
   
-  ⚠️ **ITEMS TO AVOID:**
+  ⚠️ ITEMS TO AVOID:
   List items that don't align with their goals/restrictions and explain why
   
-  💡 **SMART MODIFICATIONS:**
+  💡 SMART MODIFICATIONS:
   Suggest how to customize dishes to better fit their needs
   
-  📊 **NUTRITIONAL STRATEGY:**
+  📊 NUTRITIONAL STRATEGY:
   How to balance the meal within their daily targets
   
-  Keep recommendations practical and explain your reasoning clearly.`
+  Keep recommendations practical and explain your reasoning clearly. Do not use bold formatting with asterisks in your response.`
 
   const request: GeminiRequest = {
     contents: [
@@ -216,7 +216,7 @@ export async function analyzeMenu(menu: string, userProfile: any): Promise<strin
 export async function analyzeMenuWithImage(imageBase64: string, mimeType: string, userProfile: any): Promise<string> {
   const prompt = `Analyze this menu image for someone with these health goals and preferences:
   
-  **User Profile:**
+  User Profile:
   - Name: ${userProfile.full_name}
   - Goal: ${userProfile.goal.replace('_', ' ')}
   - Daily Targets: ${userProfile.calorie_target} calories, ${userProfile.protein_target}g protein
@@ -228,23 +228,23 @@ export async function analyzeMenuWithImage(imageBase64: string, mimeType: string
   
   Please analyze the menu in the image and provide:
   
-  🌟 **TOP RECOMMENDATIONS (3-5 best options):**
+  🌟 TOP RECOMMENDATIONS (3-5 best options):
   For each recommended item, explain:
   - Why it fits their goals
   - Estimated calories and protein
   - Nutritional benefits
   - Any suggested modifications
   
-  ⚠️ **ITEMS TO AVOID:**
+  ⚠️ ITEMS TO AVOID:
   List items that don't align with their goals/restrictions and explain why
   
-  💡 **SMART MODIFICATIONS:**
+  💡 SMART MODIFICATIONS:
   Suggest how to customize dishes to better fit their needs
   
-  📊 **NUTRITIONAL STRATEGY:**
+  📊 NUTRITIONAL STRATEGY:
   How to balance the meal within their daily targets
   
-  Keep recommendations practical and explain your reasoning clearly.`
+  Keep recommendations practical and explain your reasoning clearly. Do not use bold formatting with asterisks in your response.`
 
   const request: GeminiRequest = {
     contents: [
@@ -275,7 +275,7 @@ export async function analyzeMenuWithImage(imageBase64: string, mimeType: string
 export async function generateWeeklyNutritionRecommendations(userProfile: any): Promise<string> {
   const prompt = `Create comprehensive weekly nutrition recommendations for:
   
-  **User Profile:**
+  User Profile:
   - Name: ${userProfile.full_name}
   - Age: ${userProfile.age}, Gender: ${userProfile.gender}
   - Height: ${userProfile.height}cm, Weight: ${userProfile.weight}kg
@@ -292,32 +292,32 @@ export async function generateWeeklyNutritionRecommendations(userProfile: any): 
   
   Provide a comprehensive weekly nutrition strategy including:
   
-  🎯 **WEEKLY NUTRITION GOALS**
+  🎯 WEEKLY NUTRITION GOALS
   - Macro and micronutrient targets
   - Hydration strategy
   - Meal timing recommendations
   
-  🍽️ **REGIONAL FOOD FOCUS**
+  🍽️ REGIONAL FOOD FOCUS
   - Traditional dishes that align with their goals
   - Healthy preparation methods
   - Seasonal ingredient suggestions
   
-  📅 **WEEKLY STRUCTURE**
+  📅 WEEKLY STRUCTURE
   - Meal prep strategies
   - Shopping list organization
   - Portion control tips
   
-  💪 **PERFORMANCE OPTIMIZATION**
+  💪 PERFORMANCE OPTIMIZATION
   - Pre/post workout nutrition
   - Energy level management
   - Sleep and nutrition connection
   
-  🏥 **HEALTH CONSIDERATIONS**
+  🏥 HEALTH CONSIDERATIONS
   - Specific recommendations for their health conditions
   - Supplement suggestions if needed
   - Warning signs to watch for
   
-  Make it practical, culturally relevant, and aligned with their specific goals.`
+  Make it practical, culturally relevant, and aligned with their specific goals. Do not use bold formatting with asterisks in your response.`
 
   const request: GeminiRequest = {
     contents: [
