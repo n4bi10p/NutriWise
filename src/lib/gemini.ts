@@ -66,8 +66,8 @@ export async function chatWithGemini(message: string, userProfile?: any): Promis
     - Age: ${userProfile.age}, Gender: ${userProfile.gender}
     - Height: ${userProfile.height}cm, Weight: ${userProfile.weight}kg
     - Goal: ${userProfile.goal.replace('_', ' ')}
-    - Dietary Preferences: ${userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
-    - Regional Cuisine: ${userProfile.preferences?.regional_preference || 'No preference'}
+    - Dietary Preferences: ${userProfile.dietary_restrictions?.join(', ') || userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
+    - Regional Cuisine: ${userProfile.regional_preference || userProfile.preferences?.regional_preference || 'No preference'}
     - Allergies: ${userProfile.allergies?.join(', ') || 'None'}
     - Health Conditions: ${userProfile.health_conditions?.join(', ') || 'None'}
     - Food Preferences: ${userProfile.food_preferences?.join(', ') || 'None'}
@@ -107,8 +107,8 @@ export async function generateMealPlan(userProfile: any): Promise<string> {
   - Age: ${userProfile.age}, Gender: ${userProfile.gender}
   - Goal: ${userProfile.goal.replace('_', ' ')}
   - Daily Targets: ${userProfile.calorie_target} calories, ${userProfile.protein_target}g protein
-  - Dietary Preferences: ${userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
-  - Regional Cuisine: ${userProfile.preferences?.regional_preference || 'Mixed'}
+  - Dietary Preferences: ${userProfile.dietary_restrictions?.join(', ') || userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
+  - Regional Cuisine: ${userProfile.regional_preference || userProfile.preferences?.regional_preference || 'Mixed'}
   - Allergies: ${userProfile.allergies?.join(', ') || 'None'}
   - Health Conditions: ${userProfile.health_conditions?.join(', ') || 'None'}
   - Food Preferences: ${userProfile.food_preferences?.join(', ') || 'None'}
@@ -166,8 +166,8 @@ export async function analyzeMenu(menu: string, userProfile: any): Promise<strin
   - Name: ${userProfile.full_name}
   - Goal: ${userProfile.goal.replace('_', ' ')}
   - Daily Targets: ${userProfile.calorie_target} calories, ${userProfile.protein_target}g protein
-  - Dietary Preferences: ${userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
-  - Regional Preference: ${userProfile.preferences?.regional_preference || 'No preference'}
+  - Dietary Preferences: ${userProfile.dietary_restrictions?.join(', ') || userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
+  - Regional Preference: ${userProfile.regional_preference || userProfile.preferences?.regional_preference || 'No preference'}
   - Allergies: ${userProfile.allergies?.join(', ') || 'None'}
   - Health Conditions: ${userProfile.health_conditions?.join(', ') || 'None'}
   - Food Preferences: ${userProfile.food_preferences?.join(', ') || 'None'}
@@ -220,8 +220,8 @@ export async function analyzeMenuWithImage(imageBase64: string, mimeType: string
   - Name: ${userProfile.full_name}
   - Goal: ${userProfile.goal.replace('_', ' ')}
   - Daily Targets: ${userProfile.calorie_target} calories, ${userProfile.protein_target}g protein
-  - Dietary Preferences: ${userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
-  - Regional Preference: ${userProfile.preferences?.regional_preference || 'No preference'}
+  - Dietary Preferences: ${userProfile.dietary_restrictions?.join(', ') || userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
+  - Regional Preference: ${userProfile.regional_preference || userProfile.preferences?.regional_preference || 'No preference'}
   - Allergies: ${userProfile.allergies?.join(', ') || 'None'}
   - Health Conditions: ${userProfile.health_conditions?.join(', ') || 'None'}
   - Food Preferences: ${userProfile.food_preferences?.join(', ') || 'None'}
@@ -281,8 +281,8 @@ export async function generateWeeklyNutritionRecommendations(userProfile: any): 
   - Height: ${userProfile.height}cm, Weight: ${userProfile.weight}kg
   - Goal: ${userProfile.goal.replace('_', ' ')}
   - Daily Targets: ${userProfile.calorie_target} calories, ${userProfile.protein_target}g protein
-  - Dietary Preferences: ${userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
-  - Regional Cuisine: ${userProfile.preferences?.regional_preference || 'Mixed'}
+  - Dietary Preferences: ${userProfile.dietary_restrictions?.join(', ') || userProfile.preferences?.dietary_restrictions?.join(', ') || 'None'}
+  - Regional Cuisine: ${userProfile.regional_preference || userProfile.preferences?.regional_preference || 'Mixed'}
   - Allergies: ${userProfile.allergies?.join(', ') || 'None'}
   - Health Conditions: ${userProfile.health_conditions?.join(', ') || 'None'}
   - Food Preferences: ${userProfile.food_preferences?.join(', ') || 'None'}
