@@ -1,7 +1,10 @@
-import React, { useState } from 'react'
-import { Profile } from '../lib/supabase'
+import React, { useState, useEffect } from 'react'
+import { Profile, saveMealPlanToDatabase, getActiveMealPlan, getUserMealPlans, setActiveMealPlan, deleteMealPlan, SavedMealPlan } from '../lib/supabase'
 import { generateMealPlan, generateWeeklyNutritionRecommendations } from '../lib/gemini'
-import { Calendar, Loader, RefreshCw, Target, Sparkles, Sunrise, Sun, Moon, Apple, Info } from 'lucide-react'
+import { 
+  Calendar, Loader, RefreshCw, Target, Sparkles, Sunrise, Sun, Moon, Apple, Info, 
+  Save, History, Trash2, Check, X, Plus, BookOpen
+} from 'lucide-react'
 
 interface MealPlannerProps {
   profile: Profile
@@ -32,6 +35,53 @@ export function MealPlanner({ profile }: MealPlannerProps) {
   const [loading, setLoading] = useState(false)
   const [loadingRecommendations, setLoadingRecommendations] = useState(false)
   const [activeTab, setActiveTab] = useState<'meal-plan' | 'recommendations'>('meal-plan')
+  const [saving, setSaving] = useState(false)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false)
+  const [planName, setPlanName] = useState('')
+  const [savedPlans, setSavedPlans] = useState<SavedMealPlan[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  useEffect(() => {
+    loadActivePlans()
+  }, [profile.user_id])
+
+  const loadActivePlans = async () => {
+    try {
+      // Load active meal plan
+      const activeMealPlan = await getActiveMealPlan(profile.user_id, 'weekly_meal_plan')
+      if (activeMealPlan) {
+        setMealPlan(activeMealPlan.plan_content)
+        if (activeMealPlan.parsed_data && Object.keys(activeMealPlan.parsed_data).length > 0) {
+          setParsedMealPlan(activeMealPlan.parsed_data)
+        } else {
+          const parsed = parseMealPlan(activeMealPlan.plan_content)
+          setParsedMealPlan(parsed)
+        }
+      }
+
+      // Load active nutrition strategy
+      const activeStrategy = await getActiveMealPlan(profile.user_id, 'nutrition_strategy')
+      if (activeStrategy) {
+        setNutritionRecommendations(activeStrategy.plan_content)
+      }
+    } catch (error) {
+      console.error('Error loading active plans:', error)
+    }
+  }
+
+  const loadSavedPlans = async () => {
+    setLoadingHistory(true)
+    try {
+      const planType = activeTab === 'meal-plan' ? 'weekly_meal_plan' : 'nutrition_strategy'
+      const plans = await getUserMealPlans(profile.user_id, planType)
+      setSavedPlans(plans)
+    } catch (error) {
+      console.error('Error loading saved plans:', error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
 
   const parseMealPlan = (planText: string): ParsedMealPlan => {
     const lines = planText.split('\n').filter(line => line.trim())
@@ -144,6 +194,16 @@ export function MealPlanner({ profile }: MealPlannerProps) {
       setMealPlan(plan)
       const parsed = parseMealPlan(plan)
       setParsedMealPlan(parsed)
+      
+      // Auto-save the generated plan
+      const defaultName = `Meal Plan - ${new Date().toLocaleDateString()}`
+      await saveMealPlanToDatabase(
+        profile.user_id,
+        defaultName,
+        'weekly_meal_plan',
+        plan,
+        parsed
+      )
     } catch (error) {
       setMealPlan('Sorry, I encountered an error generating your meal plan. Please try again.')
       setParsedMealPlan(null)
@@ -157,11 +217,84 @@ export function MealPlanner({ profile }: MealPlannerProps) {
     try {
       const recommendations = await generateWeeklyNutritionRecommendations(profile)
       setNutritionRecommendations(recommendations)
+      
+      // Auto-save the generated strategy
+      const defaultName = `Nutrition Strategy - ${new Date().toLocaleDateString()}`
+      await saveMealPlanToDatabase(
+        profile.user_id,
+        defaultName,
+        'nutrition_strategy',
+        recommendations
+      )
     } catch (error) {
       setNutritionRecommendations('Sorry, I encountered an error generating your nutrition recommendations. Please try again.')
     } finally {
       setLoadingRecommendations(false)
     }
+  }
+
+  const handleSavePlan = async () => {
+    if (!planName.trim()) return
+    
+    setSaving(true)
+    try {
+      const planType = activeTab === 'meal-plan' ? 'weekly_meal_plan' : 'nutrition_strategy'
+      const content = activeTab === 'meal-plan' ? mealPlan : nutritionRecommendations
+      const parsed = activeTab === 'meal-plan' ? parsedMealPlan : undefined
+      
+      await saveMealPlanToDatabase(
+        profile.user_id,
+        planName,
+        planType,
+        content,
+        parsed
+      )
+      
+      setShowSaveDialog(false)
+      setPlanName('')
+    } catch (error) {
+      console.error('Error saving plan:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleLoadPlan = async (plan: SavedMealPlan) => {
+    try {
+      await setActiveMealPlan(plan.id, profile.user_id, plan.plan_type)
+      
+      if (plan.plan_type === 'weekly_meal_plan') {
+        setMealPlan(plan.plan_content)
+        if (plan.parsed_data && Object.keys(plan.parsed_data).length > 0) {
+          setParsedMealPlan(plan.parsed_data)
+        } else {
+          const parsed = parseMealPlan(plan.plan_content)
+          setParsedMealPlan(parsed)
+        }
+        setActiveTab('meal-plan')
+      } else {
+        setNutritionRecommendations(plan.plan_content)
+        setActiveTab('recommendations')
+      }
+      
+      setShowHistoryDialog(false)
+    } catch (error) {
+      console.error('Error loading plan:', error)
+    }
+  }
+
+  const handleDeletePlan = async (planId: string) => {
+    try {
+      await deleteMealPlan(planId)
+      await loadSavedPlans() // Refresh the list
+    } catch (error) {
+      console.error('Error deleting plan:', error)
+    }
+  }
+
+  const openHistoryDialog = () => {
+    setShowHistoryDialog(true)
+    loadSavedPlans()
   }
 
   return (
@@ -176,6 +309,26 @@ export function MealPlanner({ profile }: MealPlannerProps) {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Meal Planner</h2>
               <p className="text-sm text-gray-600 dark:text-gray-300">Generate personalized meal plans and nutrition strategies</p>
             </div>
+          </div>
+
+          <div className="flex space-x-2">
+            <button
+              onClick={openHistoryDialog}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-medium transition-colors duration-200 flex items-center"
+            >
+              <History className="w-4 h-4 mr-2" />
+              History
+            </button>
+            
+            {((activeTab === 'meal-plan' && mealPlan) || (activeTab === 'recommendations' && nutritionRecommendations)) && (
+              <button
+                onClick={() => setShowSaveDialog(true)}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium transition-colors duration-200 flex items-center"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </button>
+            )}
           </div>
         </div>
 
@@ -402,6 +555,137 @@ export function MealPlanner({ profile }: MealPlannerProps) {
             <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
               {mealPlan}
             </pre>
+          </div>
+        </div>
+      )}
+
+      {/* Save Dialog */}
+      {showSaveDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Save {activeTab === 'meal-plan' ? 'Meal Plan' : 'Nutrition Strategy'}
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Plan Name
+                </label>
+                <input
+                  type="text"
+                  value={planName}
+                  onChange={(e) => setPlanName(e.target.value)}
+                  placeholder={`My ${activeTab === 'meal-plan' ? 'Meal Plan' : 'Nutrition Strategy'}`}
+                  className="w-full px-4 py-3 bg-white/20 border border-white/10 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent dark:text-white placeholder-gray-500"
+                />
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleSavePlan}
+                  disabled={saving || !planName.trim()}
+                  className="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-xl font-semibold hover:from-green-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
+                >
+                  {saving ? (
+                    <>
+                      <Loader className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSaveDialog(false)
+                    setPlanName('')
+                  }}
+                  className="flex-1 bg-white/10 text-gray-700 dark:text-gray-300 py-3 rounded-xl font-semibold hover:bg-white/20 transition-all duration-200 flex items-center justify-center"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Dialog */}
+      {showHistoryDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Saved {activeTab === 'meal-plan' ? 'Meal Plans' : 'Nutrition Strategies'}
+              </h3>
+              <button
+                onClick={() => setShowHistoryDialog(false)}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors duration-200"
+              >
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-96">
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+              ) : savedPlans.length === 0 ? (
+                <div className="text-center py-8">
+                  <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 dark:text-gray-300">No saved plans yet</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Generate and save your first {activeTab === 'meal-plan' ? 'meal plan' : 'nutrition strategy'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {savedPlans.map((plan) => (
+                    <div key={plan.id} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {plan.name}
+                          </h4>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {new Date(plan.created_at).toLocaleDateString()}
+                            </p>
+                            {plan.is_active && (
+                              <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-full font-medium">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleLoadPlan(plan)}
+                            className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200"
+                            title="Load this plan"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePlan(plan.id)}
+                            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200"
+                            title="Delete this plan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

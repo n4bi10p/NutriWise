@@ -155,6 +155,18 @@ export type MealPlan = {
   updated_at: string
 }
 
+export type SavedMealPlan = {
+  id: string
+  user_id: string
+  name: string
+  plan_type: 'weekly_meal_plan' | 'nutrition_strategy'
+  plan_content: string
+  parsed_data: any
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type UserStreak = {
   id: string
   user_id: string
@@ -286,4 +298,96 @@ export const updateLastLogin = async (userId: string) => {
     .eq('user_id', userId)
 
   if (error) throw error
+}
+
+// Meal Plan Management Functions
+export const saveMealPlanToDatabase = async (
+  userId: string, 
+  name: string,
+  planType: 'weekly_meal_plan' | 'nutrition_strategy',
+  planContent: string,
+  parsedData?: any
+) => {
+  // First, deactivate any existing active plans of the same type
+  await supabase
+    .from('saved_meal_plans')
+    .update({ is_active: false })
+    .eq('user_id', userId)
+    .eq('plan_type', planType)
+
+  // Save the new plan as active
+  const { data, error } = await supabase
+    .from('saved_meal_plans')
+    .insert({
+      user_id: userId,
+      name,
+      plan_type: planType,
+      plan_content: planContent,
+      parsed_data: parsedData || {},
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export const getActiveMealPlan = async (userId: string, planType: 'weekly_meal_plan' | 'nutrition_strategy') => {
+  const { data, error } = await supabase
+    .from('saved_meal_plans')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('plan_type', planType)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+export const getUserMealPlans = async (userId: string, planType?: 'weekly_meal_plan' | 'nutrition_strategy') => {
+  let query = supabase
+    .from('saved_meal_plans')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (planType) {
+    query = query.eq('plan_type', planType)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+  return data
+}
+
+export const deleteMealPlan = async (planId: string) => {
+  const { error } = await supabase
+    .from('saved_meal_plans')
+    .delete()
+    .eq('id', planId)
+
+  if (error) throw error
+}
+
+export const setActiveMealPlan = async (planId: string, userId: string, planType: 'weekly_meal_plan' | 'nutrition_strategy') => {
+  // Deactivate all plans of this type for the user
+  await supabase
+    .from('saved_meal_plans')
+    .update({ is_active: false })
+    .eq('user_id', userId)
+    .eq('plan_type', planType)
+
+  // Activate the selected plan
+  const { data, error } = await supabase
+    .from('saved_meal_plans')
+    .update({ is_active: true })
+    .eq('id', planId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
 }
