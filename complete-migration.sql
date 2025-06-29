@@ -112,3 +112,37 @@ CREATE POLICY "Users can delete own grocery lists"
   FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
+
+-- Fix RLS policies for user_progress table
+-- Drop existing policy and create separate, explicit policies
+
+DROP POLICY IF EXISTS "Users can manage own progress" ON public.user_progress;
+
+-- Policy for SELECT (reading user progress)
+CREATE POLICY "Users can view own progress"
+  ON public.user_progress
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- Policy for INSERT (creating new progress entries)
+CREATE POLICY "Users can insert own progress"
+  ON public.user_progress
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+-- Policy for UPDATE (modifying progress entries)
+CREATE POLICY "Users can update own progress"
+  ON public.user_progress
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Policy for DELETE (removing progress entries)
+CREATE POLICY "Users can delete own progress"
+  ON public.user_progress
+  FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);
