@@ -74,7 +74,7 @@ SELECT 'Improved RLS fix completed! Recipe deletion should now work properly.' a
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-6 h-6 text-red-500" />
-              <h2 className="text-xl font-bold text-gray-900">Recipe Deletion Permission Error</h2>
+              <h2 className="text-xl font-bold text-gray-900">Database Permission Error</h2>
             </div>
             <button
               onClick={onClose}
@@ -95,8 +95,8 @@ SELECT 'Improved RLS fix completed! Recipe deletion should now work properly.' a
             <div>
               <h3 className="text-lg font-semibold mb-2">What's happening?</h3>
               <p className="text-gray-700">
-                The Row Level Security (RLS) policies on your database are preventing recipe deletion. 
-                This is a common issue that can be fixed by running a simple SQL script.
+                The Row Level Security (RLS) policies on your database are preventing recipe operations 
+                (deletion, rating, etc.). This is a common issue that can be fixed by running a simple SQL script.
               </p>
             </div>
 
@@ -107,7 +107,7 @@ SELECT 'Improved RLS fix completed! Recipe deletion should now work properly.' a
                 <li>Open your <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">Supabase dashboard <ExternalLink className="w-3 h-3" /></a></li>
                 <li>Go to <strong>SQL Editor</strong></li>
                 <li>Paste and run the script</li>
-                <li>Come back and try deleting the recipe again</li>
+                <li>Come back and try the operation again</li>
               </ol>
             </div>
 
@@ -139,10 +139,11 @@ SELECT 'Improved RLS fix completed! Recipe deletion should now work properly.' a
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-semibold text-blue-800 mb-2">What this script does:</h4>
               <ul className="text-blue-700 text-sm space-y-1">
-                <li>• Safely resets the Row Level Security policies for recipes</li>
-                <li>• Creates proper policies that allow users to delete their own recipes</li>
-                <li>• Maintains security by preventing users from deleting others' recipes</li>
-                <li>• Fixes the permission issues that are causing deletion to fail</li>
+                <li>• Safely resets the Row Level Security policies for recipes and ratings</li>
+                <li>• Creates proper policies for recipe deletion, rating, editing, and viewing</li>
+                <li>• Maintains security by preventing unauthorized access to other users' data</li>
+                <li>• Fixes permission issues that cause operations to fail</li>
+                <li>• Creates the recipe_ratings table if it doesn't exist</li>
               </ul>
             </div>
 

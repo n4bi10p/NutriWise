@@ -915,39 +915,88 @@ export const checkUserContext = async (recipeId: string) => {
   }
 }
 
-export const rateRecipe = async (userId: string, recipeId: string, rating: number, review?: string) => {
-  // First, check if user has already rated this recipe
-  const { data: existingRating } = await supabase
-    .from('recipe_ratings')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('recipe_id', recipeId)
-    .single()
+export const getUserRating = async (userId: string, recipeId: string): Promise<RecipeRating | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('recipe_ratings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('recipe_id', recipeId)
+      .single()
 
-  if (existingRating) {
-    // Update existing rating
-    const { error } = await supabase
-      .from('recipe_ratings')
-      .update({ rating, review })
-      .eq('id', existingRating.id)
-    
-    if (error) throw error
-  } else {
-    // Insert new rating
-    const { error } = await supabase
-      .from('recipe_ratings')
-      .insert({
-        user_id: userId,
-        recipe_id: recipeId,
-        rating,
-        review
-      })
-    
-    if (error) throw error
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      throw error
+    }
+
+    return data || null
+  } catch (error) {
+    console.error('Error getting user rating:', error)
+    return null
   }
+}
 
-  // Update recipe's average rating
-  await updateRecipeRating(recipeId)
+export const rateRecipe = async (userId: string, recipeId: string, rating: number, review?: string) => {
+  try {
+    console.log('Attempting to rate recipe:', { userId, recipeId, rating })
+    
+    // First, check if user has already rated this recipe
+    const { data: existingRating, error: fetchError } = await supabase
+      .from('recipe_ratings')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('recipe_id', recipeId)
+      .single()
+
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('Error checking existing rating:', fetchError)
+      throw new Error(`Failed to check existing rating: ${fetchError.message}`)
+    }
+
+    if (existingRating) {
+      console.log('Updating existing rating:', existingRating.id)
+      // Update existing rating
+      const { error } = await supabase
+        .from('recipe_ratings')
+        .update({ rating, review, updated_at: new Date().toISOString() })
+        .eq('id', existingRating.id)
+      
+      if (error) {
+        console.error('Error updating rating:', error)
+        if (error.message?.includes('row-level security')) {
+          throw new Error(`Permission denied: ${error.message}. You may need to run the IMPROVED_RLS_FIX.sql script.`)
+        }
+        throw new Error(`Failed to update rating: ${error.message}`)
+      }
+    } else {
+      console.log('Inserting new rating')
+      // Insert new rating
+      const { error } = await supabase
+        .from('recipe_ratings')
+        .insert({
+          user_id: userId,
+          recipe_id: recipeId,
+          rating,
+          review
+        })
+      
+      if (error) {
+        console.error('Error inserting rating:', error)
+        if (error.message?.includes('row-level security')) {
+          throw new Error(`Permission denied: ${error.message}. You may need to run the IMPROVED_RLS_FIX.sql script to enable rating permissions.`)
+        }
+        throw new Error(`Failed to submit rating: ${error.message}`)
+      }
+    }
+
+    console.log('Rating operation successful, updating recipe averages...')
+    // Update recipe's average rating
+    await updateRecipeRating(recipeId)
+    console.log('Recipe rating updated successfully')
+    
+  } catch (error) {
+    console.error('Error in rateRecipe:', error)
+    throw error
+  }
 }
 
 const updateRecipeRating = async (recipeId: string) => {

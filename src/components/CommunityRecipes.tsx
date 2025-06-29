@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Profile, getCommunityRecipes, CommunityRecipe, createCommunityRecipe, updateCommunityRecipe, deleteCommunityRecipe, checkUserContext, supabase } from '../lib/supabase'
+import { Profile, getCommunityRecipes, CommunityRecipe, createCommunityRecipe, updateCommunityRecipe, deleteCommunityRecipe, checkUserContext, supabase, rateRecipe, getUserRating } from '../lib/supabase'
 import { Users, Star, Clock, ChefHat, Search, Plus, Heart, X, Edit2, Trash2, Eye } from 'lucide-react'
 import RLSFixModal from './RLSFixModal'
 
@@ -24,6 +24,11 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [showRLSFix, setShowRLSFix] = useState(false)
   const [rlsErrorMessage, setRlsErrorMessage] = useState<string>('')
+  const [userRatings, setUserRatings] = useState<Record<string, number>>({})
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [ratingRecipeId, setRatingRecipeId] = useState<string | null>(null)
+  const [selectedRating, setSelectedRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0)
 
   // Form state for sharing recipe
   const [formData, setFormData] = useState({
@@ -61,12 +66,44 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
     loadRecipes()
   }, [])
 
+  useEffect(() => {
+    // Load user ratings when currentUserId changes and we have recipes
+    if (currentUserId && recipes.length > 0) {
+      const recipeIds = recipes.map(recipe => recipe.id)
+      loadUserRatings(recipeIds)
+    }
+  }, [currentUserId, recipes.length])
+
+  const loadUserRatings = async (recipeIds: string[]) => {
+    if (!currentUserId || recipeIds.length === 0) return
+
+    const ratings: Record<string, number> = {}
+    
+    try {
+      for (const recipeId of recipeIds) {
+        const userRating = await getUserRating(currentUserId, recipeId)
+        if (userRating) {
+          ratings[recipeId] = userRating.rating
+        }
+      }
+      setUserRatings(ratings)
+    } catch (error) {
+      console.error('Error loading user ratings:', error)
+    }
+  }
+
   const loadRecipes = async () => {
     try {
       setError(null)
       const data = await getCommunityRecipes(20, 0)
       console.log('Loaded recipes:', data)
       setRecipes(data || [])
+      
+      // Load user ratings for these recipes
+      if (data && data.length > 0) {
+        const recipeIds = data.map(recipe => recipe.id)
+        await loadUserRatings(recipeIds)
+      }
       
       // If no recipes are returned, it might be a database issue
       if (!data || data.length === 0) {
@@ -341,6 +378,69 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
     setSelectedRecipe(null)
   }
 
+  const handleRateRecipe = (recipeId: string) => {
+    if (!currentUserId) {
+      setShareError('You must be logged in to rate recipes')
+      setTimeout(() => setShareError(null), 3000)
+      return
+    }
+    setRatingRecipeId(recipeId)
+    setSelectedRating(userRatings[recipeId] || 0)
+    setHoverRating(0)
+    setShowRatingModal(true)
+  }
+
+  const submitRating = async () => {
+    if (!currentUserId || !ratingRecipeId || selectedRating === 0) return
+
+    try {
+      setShareError(null)
+      await rateRecipe(currentUserId, ratingRecipeId, selectedRating)
+      
+      // Update local state
+      setUserRatings(prev => ({
+        ...prev,
+        [ratingRecipeId]: selectedRating
+      }))
+      
+      setShareSuccess('Rating submitted successfully!')
+      setShowRatingModal(false)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setShareSuccess(null)
+      }, 3000)
+      
+      // Reload recipes to get updated averages
+      await loadRecipes()
+      
+    } catch (error) {
+      console.error('Error submitting rating:', error)
+      
+      // Handle specific RLS/policy error messages for ratings
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit rating. Please try again.'
+      
+      // Check if this is an RLS policy error for ratings
+      if (errorMessage.includes('row-level security policy for table "recipe_ratings"') ||
+          errorMessage.includes('violates row-level security') ||
+          errorMessage.includes('permission denied') ||
+          errorMessage.includes('policy')) {
+        setRlsErrorMessage(`Rating submission failed due to database permission issues: ${errorMessage}. Please run the IMPROVED_RLS_FIX.sql script to fix rating permissions.`)
+        setShowRLSFix(true)
+        setShowRatingModal(false) // Close rating modal
+      } else {
+        setShareError(errorMessage)
+      }
+    }
+  }
+
+  const closeRatingModal = () => {
+    setShowRatingModal(false)
+    setRatingRecipeId(null)
+    setSelectedRating(0)
+    setHoverRating(0)
+  }
+
   const filteredRecipes = recipes.filter(recipe => {
     const matchesSearch = recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          recipe.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -350,15 +450,46 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
     return matchesSearch && matchesDifficulty && matchesCuisine
   })
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`w-4 h-4 ${
-          i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-        }`}
-      />
-    ))
+  const renderStars = (rating: number, recipeId?: string, interactive = false) => {
+    return Array.from({ length: 5 }, (_, i) => {
+      const starValue = i + 1
+      const isFilled = i < Math.floor(rating)
+      const userRating = recipeId ? userRatings[recipeId] : 0
+      const hasUserRated = userRating > 0
+      
+      return (
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            interactive 
+              ? `cursor-pointer transition-colors ${
+                  isFilled ? 'text-yellow-400 fill-current' : 'text-gray-300 hover:text-yellow-300'
+                }`
+              : isFilled ? 'text-yellow-400 fill-current' : 'text-gray-300'
+          } ${hasUserRated && userRating >= starValue ? 'ring-2 ring-blue-400 rounded-full' : ''}`}
+          onClick={interactive && recipeId ? () => handleRateRecipe(recipeId) : undefined}
+        />
+      )
+    })
+  }
+
+  const renderInteractiveStars = (rating: number, onRate: (rating: number) => void, hover: number, onHover: (rating: number) => void) => {
+    return Array.from({ length: 5 }, (_, i) => {
+      const starValue = i + 1
+      const isFilled = starValue <= (hover || rating)
+      
+      return (
+        <Star
+          key={i}
+          className={`w-8 h-8 cursor-pointer transition-all duration-200 ${
+            isFilled ? 'text-yellow-400 fill-current scale-110' : 'text-gray-300 hover:text-yellow-300'
+          }`}
+          onClick={() => onRate(starValue)}
+          onMouseEnter={() => onHover(starValue)}
+          onMouseLeave={() => onHover(0)}
+        />
+      )
+    })
   }
 
   const getDifficultyColor = (difficulty: string) => {
@@ -505,11 +636,18 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
               </p>
               
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  {renderStars(recipe.rating_average)}
-                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center cursor-pointer" onClick={() => handleRateRecipe(recipe.id)}>
+                    {renderStars(recipe.rating_average, recipe.id, true)}
+                  </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
                     ({recipe.rating_count})
                   </span>
+                  {userRatings[recipe.id] && (
+                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                      You: {userRatings[recipe.id]}★
+                    </span>
+                  )}
                 </div>
                 
                 <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
@@ -1012,11 +1150,30 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
 
                 {/* Rating in the centered section */}
                 <div className="mt-4 text-center">
-                  <div className="flex items-center justify-center">
-                    {renderStars(selectedRecipe.rating_average)}
-                    <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">
-                      {selectedRecipe.rating_average.toFixed(1)} ({selectedRecipe.rating_count} reviews)
-                    </span>
+                  <div className="flex items-center justify-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center cursor-pointer" onClick={() => handleRateRecipe(selectedRecipe.id)}>
+                        {renderStars(selectedRecipe.rating_average, selectedRecipe.id, true)}
+                      </div>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {selectedRecipe.rating_average.toFixed(1)} ({selectedRecipe.rating_count} reviews)
+                      </span>
+                    </div>
+                    {userRatings[selectedRecipe.id] && (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                          You rated: {userRatings[selectedRecipe.id]}★
+                        </span>
+                      </div>
+                    )}
+                    {currentUserId && !userRatings[selectedRecipe.id] && (
+                      <button
+                        onClick={() => handleRateRecipe(selectedRecipe.id)}
+                        className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs rounded-full hover:from-yellow-500 hover:to-orange-600 transition-all duration-200"
+                      >
+                        Rate Recipe
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1118,6 +1275,64 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rating Modal */}
+      {showRatingModal && ratingRecipeId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Rate This Recipe
+                </h3>
+                <button
+                  onClick={closeRatingModal}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  How would you rate this recipe?
+                </p>
+                
+                <div className="flex justify-center space-x-2 mb-6">
+                  {renderInteractiveStars(
+                    selectedRating,
+                    setSelectedRating,
+                    hoverRating,
+                    setHoverRating
+                  )}
+                </div>
+                
+                {selectedRating > 0 && (
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+                    {selectedRating} Star{selectedRating > 1 ? 's' : ''}
+                  </p>
+                )}
+                
+                <div className="flex space-x-3">
+                  <button
+                    onClick={closeRatingModal}
+                    className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitRating}
+                    disabled={selectedRating === 0}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:from-pink-600 hover:to-rose-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Submit Rating
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
