@@ -114,17 +114,17 @@ export type CommunityRecipe = {
   user_id: string
   title: string
   description?: string
-  ingredients: string[]
+  ingredients: string[] // This will be stored as JSONB but parsed as string array
   instructions: string
   prep_time?: number
   cook_time?: number
   servings: number
   calories_per_serving?: number
   protein_per_serving?: number
-  tags: string[]
+  tags: string[] // This will be stored as JSONB but parsed as string array
   difficulty: 'easy' | 'medium' | 'hard'
   cuisine_type?: string
-  dietary_tags: string[]
+  dietary_tags: string[] // This will be stored as JSONB but parsed as string array
   image_url?: string
   is_public: boolean
   rating_average: number
@@ -443,19 +443,52 @@ export const getAvailableAchievements = async () => {
 }
 
 export const getCommunityRecipes = async (limit: number = 20, offset: number = 0) => {
+  // First try to get recipes without the profiles join since it's causing issues
   const { data, error } = await supabase
     .from('community_recipes')
-    .select(`
-      *,
-      profiles!inner(full_name)
-    `)
+    .select('*')
     .eq('is_public', true)
     .order('rating_average', { ascending: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (error) throw error
-  return data
+  if (error) {
+    console.error('Failed to fetch community recipes:', error)
+    throw error
+  }
+
+  // If we got recipes, try to enrich them with user profile data
+  if (data && data.length > 0) {
+    // Get unique user IDs from the recipes
+    const userIds = [...new Set(data.map(recipe => recipe.user_id))]
+    
+    try {
+      // Fetch profile data for these users
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds)
+      
+      if (!profileError && profiles) {
+        // Create a lookup map for profiles
+        const profileMap = new Map(profiles.map(p => [p.user_id, p]))
+        
+        // Enrich recipes with profile data
+        return data.map(recipe => ({
+          ...recipe,
+          profiles: profileMap.get(recipe.user_id) || { full_name: 'Anonymous' }
+        }))
+      }
+    } catch (profileError) {
+      console.warn('Failed to fetch user profiles, using anonymous names:', profileError)
+    }
+  }
+
+  // Return recipes without profile enrichment if profile fetch failed
+  return data?.map(recipe => ({
+    ...recipe,
+    profiles: { full_name: 'Anonymous' }
+  })) || []
 }
 
 export const saveGroceryList = async (userId: string, listData: Omit<GroceryList, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
@@ -675,4 +708,241 @@ export const setActiveMealPlan = async (planId: string, userId: string, planType
 
   if (error) throw error
   return data
+}
+
+export const createCommunityRecipe = async (userId: string, recipeData: Omit<CommunityRecipe, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'rating_average' | 'rating_count' | 'profiles'>) => {
+  // Debug: Check current user authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  console.log('Current authenticated user:', user?.id)
+  console.log('Provided userId:', userId)
+  
+  if (authError) {
+    console.error('Auth error:', authError)
+    throw authError
+  }
+  
+  if (!user) {
+    throw new Error('User not authenticated')
+  }
+  
+  // Use the authenticated user's ID instead of the provided userId
+  const { data, error } = await supabase
+    .from('community_recipes')
+    .insert({
+      user_id: user.id, // Use the authenticated user's ID
+      ...recipeData,
+      rating_average: 0,
+      rating_count: 0
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export const updateCommunityRecipe = async (recipeId: string, updates: Partial<Omit<CommunityRecipe, 'id' | 'user_id' | 'created_at' | 'rating_average' | 'rating_count' | 'profiles'>>) => {
+  const { data, error } = await supabase
+    .from('community_recipes')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', recipeId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export const deleteCommunityRecipe = async (recipeId: string) => {
+  console.log('Attempting to delete recipe:', recipeId)
+  
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError) {
+    console.error('Auth error:', authError)
+    throw new Error('Authentication failed')
+  }
+  if (!user) {
+    throw new Error('User not authenticated')
+  }
+
+  console.log('Current user ID:', user.id)
+
+  // First verify the user owns this recipe
+  const { data: recipe, error: fetchError } = await supabase
+    .from('community_recipes')
+    .select('user_id, title')
+    .eq('id', recipeId)
+    .single()
+
+  if (fetchError) {
+    console.error('Error fetching recipe:', fetchError)
+    throw new Error('Recipe not found')
+  }
+
+  console.log('Recipe found:', recipe.title)
+  console.log('Recipe owner ID:', recipe.user_id)
+  console.log('Current user ID:', user.id)
+  console.log('IDs match?', recipe.user_id === user.id)
+  console.log('Recipe owner type:', typeof recipe.user_id)
+  console.log('Current user type:', typeof user.id)
+
+  if (recipe.user_id !== user.id) {
+    console.error('User does not own this recipe. Recipe owner:', recipe.user_id, 'Current user:', user.id)
+    throw new Error('You can only delete your own recipes')
+  }
+
+  // Get the auth UID for comparison
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  console.log('Auth UID:', authUser?.id)
+
+  // Try the delete operation with detailed logging
+  console.log('Attempting delete...')
+  const { data, error, count } = await supabase
+    .from('community_recipes')
+    .delete({ count: 'exact' })
+    .eq('id', recipeId)
+
+  console.log('Delete query executed')
+  console.log('Error:', error)
+  console.log('Count:', count)
+  console.log('Data:', data)
+
+  if (error) {
+    console.error('Delete error details:', error)
+    throw new Error(`Delete failed: ${error.message}`)
+  }
+
+  if (count === 0) {
+    // Check if the recipe still exists
+    const { data: stillExists, error: checkError } = await supabase
+      .from('community_recipes')
+      .select('id, user_id, title')
+      .eq('id', recipeId)
+      .single()
+    
+    console.log('Recipe check after failed delete:', stillExists)
+    console.log('Check error:', checkError)
+    
+    if (stillExists) {
+      throw new Error('Recipe still exists after delete attempt. This might be a Row Level Security (RLS) policy issue. Please check that your user ID matches the recipe owner ID.')
+    } else {
+      console.log('Recipe no longer exists, delete may have succeeded despite count=0')
+      return { deletedCount: 1, data: null }
+    }
+  }
+
+  console.log('Delete successful, affected rows:', count)
+  return { deletedCount: count, data }
+}
+
+// Temporary function to test deletion without RLS (for debugging only)
+export const debugDeleteCommunityRecipe = async (recipeId: string) => {
+  console.log('DEBUG: Attempting to delete recipe with admin privileges:', recipeId)
+  
+  // This should only be used for debugging - in production, always use RLS
+  const { data, error, count } = await supabase
+    .from('community_recipes')
+    .delete({ count: 'exact' })
+    .eq('id', recipeId)
+
+  console.log('DEBUG Delete result:', { data, error, count })
+  return { data, error, count }
+}
+
+// Function to check current user context and compare with recipe ownership
+export const checkUserContext = async (recipeId: string) => {
+  // Get auth user
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  console.log('Auth user:', user)
+  console.log('Auth error:', authError)
+
+  // Get recipe details
+  const { data: recipe, error: recipeError } = await supabase
+    .from('community_recipes')
+    .select('*')
+    .eq('id', recipeId)
+    .single()
+
+  console.log('Recipe details:', recipe)
+  console.log('Recipe error:', recipeError)
+
+  // Test RLS by trying a select with the current user context
+  const { data: rlsTest, error: rlsError } = await supabase
+    .from('community_recipes')
+    .select('id, title, user_id')
+    .eq('id', recipeId)
+    .eq('user_id', user?.id)
+
+  console.log('RLS test (recipes owned by current user):', rlsTest)
+  console.log('RLS test error:', rlsError)
+
+  return {
+    authUser: user,
+    recipe,
+    rlsTest,
+    canDelete: recipe && user && recipe.user_id === user.id
+  }
+}
+
+export const rateRecipe = async (userId: string, recipeId: string, rating: number, review?: string) => {
+  // First, check if user has already rated this recipe
+  const { data: existingRating } = await supabase
+    .from('recipe_ratings')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('recipe_id', recipeId)
+    .single()
+
+  if (existingRating) {
+    // Update existing rating
+    const { error } = await supabase
+      .from('recipe_ratings')
+      .update({ rating, review })
+      .eq('id', existingRating.id)
+    
+    if (error) throw error
+  } else {
+    // Insert new rating
+    const { error } = await supabase
+      .from('recipe_ratings')
+      .insert({
+        user_id: userId,
+        recipe_id: recipeId,
+        rating,
+        review
+      })
+    
+    if (error) throw error
+  }
+
+  // Update recipe's average rating
+  await updateRecipeRating(recipeId)
+}
+
+const updateRecipeRating = async (recipeId: string) => {
+  // Calculate new average rating
+  const { data: ratings, error } = await supabase
+    .from('recipe_ratings')
+    .select('rating')
+    .eq('recipe_id', recipeId)
+
+  if (error) throw error
+
+  if (ratings && ratings.length > 0) {
+    const average = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+    const count = ratings.length
+
+    // Update the recipe with new rating data
+    await supabase
+      .from('community_recipes')
+      .update({
+        rating_average: Math.round(average * 100) / 100, // Round to 2 decimal places
+        rating_count: count
+      })
+      .eq('id', recipeId)
+  }
 }
