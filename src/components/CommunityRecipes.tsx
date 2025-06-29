@@ -504,7 +504,14 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="flex space-x-2">
+            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 animate-fade-in">Loading community recipes...</p>
+        </div>
       </div>
     )
   }

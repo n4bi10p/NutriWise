@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Profile, getUserPreferences } from '../lib/supabase'
 import { chatWithGemini } from '../lib/gemini'
-import { Send, Bot, User, Loader, Sparkles } from 'lucide-react'
+import { Send, User, Loader, Sparkles } from 'lucide-react'
 
 interface ChatAssistantProps {
   profile: Profile
@@ -121,53 +121,53 @@ What would you like to know about nutrition and health today?`,
   }
 
   return (
-    <div className="h-full flex flex-col bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl">
+    <div className="flex flex-col h-full bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/40 dark:border-white/20 shadow-2xl rounded-3xl overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-white/10">
+      <div className="flex-shrink-0 p-8 border-b border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/5">
         <div className="flex items-center">
-          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-3">
-            <Sparkles className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-purple-500/25">
+            <Sparkles className="w-7 h-7 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nutrition Assistant</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Your personalized nutrition companion</p>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">Nutrition Assistant</h2>
+            <p className="text-gray-600 dark:text-gray-300">Your personalized nutrition companion</p>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar min-h-0">
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
           >
             <div
               className={`flex max-w-xs lg:max-w-md xl:max-w-lg ${
                 message.type === 'user' ? 'flex-row-reverse' : 'flex-row'
-              }`}
+              } group`}
             >
-              <div className={`flex-shrink-0 ${message.type === 'user' ? 'ml-3' : 'mr-3'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.type === 'user' ? 'bg-blue-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'
+              <div className={`flex-shrink-0 ${message.type === 'user' ? 'ml-4' : 'mr-4'}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-200 group-hover:scale-110 ${
+                  message.type === 'user' ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'
                 }`}>
                   {message.type === 'user' ? (
-                    <User className="w-4 h-4 text-white" />
+                    <User className="w-5 h-5 text-white" />
                   ) : (
-                    <Sparkles className="w-4 h-4 text-white" />
+                    <Sparkles className="w-5 h-5 text-white" />
                   )}
                 </div>
               </div>
               <div
-                className={`px-4 py-3 rounded-2xl ${
+                className={`px-6 py-4 rounded-2xl backdrop-blur-lg transition-all duration-200 group-hover:scale-[1.02] ${
                   message.type === 'user'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white/20 text-gray-900 dark:text-white border border-white/10'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25'
+                    : 'bg-white/30 dark:bg-white/10 text-gray-800 dark:text-white border border-white/40 dark:border-white/20 shadow-lg'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                <p className={`text-xs mt-2 ${
-                  message.type === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                <p className="text-sm whitespace-pre-wrap leading-relaxed font-medium">{message.content}</p>
+                <p className={`text-xs mt-3 opacity-75 ${
+                  message.type === 'user' ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'
                 }`}>
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
@@ -176,14 +176,14 @@ What would you like to know about nutrition and health today?`,
           </div>
         ))}
         {loading && (
-          <div className="flex justify-start">
-            <div className="flex">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-3">
-                <Loader className="w-4 h-4 text-white animate-spin" />
+          <div className="flex justify-start animate-in slide-in-from-bottom-2 duration-300">
+            <div className="flex group">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-4 shadow-lg">
+                <Loader className="w-5 h-5 text-white animate-spin" />
               </div>
-              <div className="bg-white/20 border border-white/10 px-4 py-3 rounded-2xl">
-                <p className="text-sm text-gray-900 dark:text-white">Assistant is thinking...</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Analyzing your profile and generating response</p>
+              <div className="bg-white/30 dark:bg-white/10 border border-white/40 dark:border-white/20 px-6 py-4 rounded-2xl backdrop-blur-lg shadow-lg">
+                <p className="text-sm text-gray-800 dark:text-white font-medium">Assistant is thinking...</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 opacity-75">Analyzing your profile and generating response</p>
               </div>
             </div>
           </div>
@@ -193,14 +193,14 @@ What would you like to know about nutrition and health today?`,
 
       {/* Quick Questions */}
       {messages.length === 1 && (
-        <div className="px-6 py-4 border-t border-white/10">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Quick questions to get started:</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex-shrink-0 px-8 py-6 border-t border-white/30 dark:border-white/20 bg-white/10 dark:bg-white/5">
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">Quick questions to get started:</p>
+          <div className="flex flex-wrap gap-3">
             {quickQuestions.map((question, index) => (
               <button
                 key={index}
                 onClick={() => handleQuickQuestion(question)}
-                className="text-xs px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-gray-700 dark:text-gray-300 transition-all duration-200 hover:scale-105"
+                className="text-xs bg-white/20 dark:bg-white/10 hover:bg-white/30 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 transform shadow-lg border border-white/30 dark:border-white/20"
               >
                 {question}
               </button>
@@ -210,22 +210,22 @@ What would you like to know about nutrition and health today?`,
       )}
 
       {/* Input */}
-      <div className="p-6 border-t border-white/10">
+      <div className="flex-shrink-0 p-8 border-t border-white/30 dark:border-white/20 bg-white/10 dark:bg-white/5">
         <form onSubmit={handleSubmit} className="flex space-x-4">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask me about nutrition, meals, or dietary advice..."
-            className="flex-1 px-4 py-3 bg-white/20 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:text-white placeholder-gray-500"
+            className="flex-1 px-6 py-4 bg-white/30 dark:bg-white/10 border border-white/40 dark:border-white/20 rounded-2xl focus:ring-4 focus:ring-purple-500/30 focus:border-purple-400 dark:text-white placeholder-gray-600 dark:placeholder-gray-400 backdrop-blur-lg shadow-lg transition-all duration-200"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
+            className="px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center shadow-xl hover:shadow-purple-500/25 hover:scale-105 transform"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </button>
         </form>
       </div>

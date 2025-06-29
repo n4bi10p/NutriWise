@@ -336,3 +336,83 @@ export async function generateWeeklyNutritionRecommendations(userProfile: any): 
 
   return await callGeminiAPI(request)
 }
+
+export async function generateHealthTips(profile: any) {
+  const prompt = `As a nutrition and fitness expert, generate 4 specific, actionable tips for this user:
+
+USER PROFILE:
+- Name: ${profile.full_name}
+- Age: ${profile.age} years old
+- Weight: ${profile.weight} kg
+- Height: ${profile.height} cm
+- Goal: ${profile.goal.replace('_', ' ')}
+- Activity Level: ${profile.activity_level.replace('_', ' ')}
+- Current Level: ${profile.level}
+- Current Streak: ${profile.streak_days} days
+- Calorie Target: ${profile.calorie_target} calories
+- Protein Target: ${profile.protein_target}g
+- Water Goal: ${profile.water_goal_ltr}L
+
+Generate exactly 4 tips in this JSON format:
+{
+  "healthTip": "A general health tip based on their profile and goals",
+  "trainingTip": "A specific workout or exercise recommendation",
+  "nutritionTip": "A specific nutrition advice for their goals",
+  "maintenanceTip": "A lifestyle maintenance tip for long-term success"
+}
+
+Make each tip:
+- Specific to their profile
+- Actionable (they can do it today)
+- 1-2 sentences maximum
+- Motivating and positive
+- Based on their current level and streak
+
+Return only valid JSON, no additional text.`
+
+  try {
+    const request: GeminiRequest = {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 512,
+      }
+    }
+
+    const response = await callGeminiAPI(request)
+    
+    // Try to parse JSON response
+    try {
+      const tips = JSON.parse(response)
+      return tips
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', parseError)
+      // Return fallback tips
+      return generateFallbackTips(profile)
+    }
+  } catch (error) {
+    console.error('Error generating health tips:', error)
+    return generateFallbackTips(profile)
+  }
+}
+
+function generateFallbackTips(profile: any) {
+  const goal = profile.goal.replace('_', ' ')
+  const level = profile.level
+  
+  return {
+    healthTip: `Great job on your ${profile.streak_days}-day streak! Keep maintaining consistency in your ${goal} journey.`,
+    trainingTip: level <= 2 
+      ? "Start with 20-30 minutes of light exercise today. Even a brisk walk counts!"
+      : "Challenge yourself with a new exercise variation or increase your workout intensity by 10%.",
+    nutritionTip: `Focus on hitting your ${profile.protein_target}g protein target today with lean sources like chicken, fish, or legumes.`,
+    maintenanceTip: `Remember to drink ${profile.water_goal_ltr}L of water today and aim for 7-9 hours of quality sleep tonight.`
+  }
+}

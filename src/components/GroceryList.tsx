@@ -223,44 +223,50 @@ Format as a simple list with categories and items underneath. Include estimated 
   }, {} as Record<string, GroceryItem[]>)
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
-        <div className="flex items-center mb-6">
-          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center mr-3">
-            <ShoppingCart className="w-6 h-6 text-white" />
+    <div className="space-y-8 p-6">
+      {/* Header Card */}
+      <div className="bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/40 dark:border-white/20 shadow-2xl rounded-3xl p-8 transform hover:scale-[1.01] transition-all duration-200">
+        <div className="flex items-center mb-8">
+          <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-purple-500/25">
+            <ShoppingCart className="w-7 h-7 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Smart Grocery List Generator</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Generate, save, and share shopping lists from your meal plans</p>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">Smart Grocery List Generator</h2>
+            <p className="text-gray-600 dark:text-gray-300">Generate, save, and share shopping lists from your meal plans</p>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
               Meal Plan or Recipes
             </label>
-            <textarea
-              value={mealPlanInput}
-              onChange={(e) => setMealPlanInput(e.target.value)}
-              placeholder="Paste your meal plan or list of recipes here..."
-              className="w-full h-32 px-4 py-3 bg-white/20 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:text-white placeholder-gray-500 resize-none"
-            />
+            <div className="relative">
+              <textarea
+                value={mealPlanInput}
+                onChange={(e) => setMealPlanInput(e.target.value)}
+                placeholder="Paste your meal plan or list of recipes here..."
+                className="w-full h-36 px-6 py-4 bg-white/40 dark:bg-white/10 border border-white/50 dark:border-white/20 rounded-2xl focus:ring-4 focus:ring-purple-500/30 focus:border-purple-400 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none transition-all duration-200 shadow-lg backdrop-blur-lg"
+              />
+              <div className="absolute bottom-4 right-4 text-xs text-gray-500 dark:text-gray-400">
+                {mealPlanInput.length} characters
+              </div>
+            </div>
           </div>
 
           <button
             onClick={generateGroceryList}
             disabled={loading || !mealPlanInput.trim()}
-            className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
+            className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-4 rounded-2xl font-semibold hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] transform"
           >
             {loading ? (
               <>
-                <Loader className="w-4 h-4 mr-2 animate-spin" />
+                <Loader className="w-5 h-5 mr-3 animate-spin" />
                 Generating List...
               </>
             ) : (
               <>
-                <ShoppingCart className="w-4 h-4 mr-2" />
+                <ShoppingCart className="w-5 h-5 mr-3" />
                 Generate Grocery List
               </>
             )}
@@ -269,51 +275,56 @@ Format as a simple list with categories and items underneath. Include estimated 
       </div>
 
       {groceryItems.length > 0 && (
-        <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+        <div className="bg-white/30 dark:bg-white/10 backdrop-blur-xl border border-white/40 dark:border-white/20 shadow-2xl rounded-3xl p-8 transform hover:scale-[1.005] transition-all duration-200">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 space-y-4 lg:space-y-0">
+            <div className="flex-1">
               <input
                 type="text"
                 value={listName}
                 onChange={(e) => setListName(e.target.value)}
                 placeholder="Enter list name..."
-                className="text-lg font-semibold bg-transparent border-none text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none"
+                className="text-2xl font-bold bg-transparent border-none text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none w-full mb-2"
               />
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                {groceryItems.filter(item => !item.checked).length} items remaining
-              </p>
+              <div className="flex items-center space-x-4">
+                <p className="text-sm text-gray-600 dark:text-gray-300 bg-white/20 dark:bg-white/10 px-3 py-1 rounded-full">
+                  {groceryItems.filter(item => !item.checked).length} items remaining
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 bg-white/20 dark:bg-white/10 px-3 py-1 rounded-full">
+                  {groceryItems.filter(item => item.checked).length} completed
+                </p>
+              </div>
             </div>
             
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={saveList}
                 disabled={saving}
-                className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
+                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center shadow-lg hover:shadow-green-500/25 hover:scale-105 transform disabled:opacity-50"
               >
-                <Save className="w-4 h-4 mr-1" />
+                <Save className="w-4 h-4 mr-2" />
                 {saving ? 'Saving...' : 'Save'}
               </button>
               
               <button
                 onClick={shareList}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
+                className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center shadow-lg hover:shadow-blue-500/25 hover:scale-105 transform"
               >
-                <Share className="w-4 h-4 mr-1" />
+                <Share className="w-4 h-4 mr-2" />
                 Share
               </button>
               
               <button
                 onClick={exportList}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
+                className="bg-gradient-to-r from-gray-500 to-slate-500 hover:from-gray-600 hover:to-slate-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center shadow-lg hover:shadow-gray-500/25 hover:scale-105 transform"
               >
-                <Download className="w-4 h-4 mr-1" />
+                <Download className="w-4 h-4 mr-2" />
                 Export
               </button>
               
               {groceryItems.some(item => item.checked) && (
                 <button
                   onClick={clearChecked}
-                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                  className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 shadow-lg hover:shadow-red-500/25 hover:scale-105 transform"
                 >
                   Clear Checked
                 </button>
@@ -321,33 +332,39 @@ Format as a simple list with categories and items underneath. Include estimated 
             </div>
           </div>
 
-          <div className="space-y-4 max-h-96 overflow-y-auto">
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
             {Object.entries(groupedItems).map(([category, items]) => (
-              <div key={category} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{category}</h3>
-                <div className="space-y-2">
+              <div key={category} className="bg-white/20 dark:bg-white/5 backdrop-blur-lg border border-white/30 dark:border-white/15 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.01]">
+                <div className="flex items-center mb-4">
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white mr-3">{category}</h3>
+                  <div className="flex-1 h-px bg-gradient-to-r from-gray-300 dark:from-gray-600 to-transparent"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400 bg-white/20 dark:bg-white/10 px-3 py-1 rounded-full ml-3">
+                    {items.length} items
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map((item) => (
                     <div
                       key={item.id}
-                      className={`flex items-center p-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl transition-all duration-200 ${
-                        item.checked ? 'opacity-50' : ''
+                      className={`group flex items-center p-4 bg-white/25 dark:bg-white/10 backdrop-blur-sm border border-white/40 dark:border-white/20 rounded-xl transition-all duration-150 hover:shadow-lg cursor-pointer ${
+                        item.checked ? 'opacity-60 scale-95' : 'hover:scale-[1.02] hover:bg-white/35 dark:hover:bg-white/15'
                       }`}
+                      onClick={() => toggleItem(item.id)}
                     >
                       <button
-                        onClick={() => toggleItem(item.id)}
-                        className={`w-5 h-5 rounded border-2 mr-3 flex items-center justify-center transition-colors duration-200 ${
+                        className={`w-6 h-6 rounded-lg border-2 mr-4 flex items-center justify-center transition-all duration-150 flex-shrink-0 ${
                           item.checked
-                            ? 'bg-green-500 border-green-500'
-                            : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 border-green-500 shadow-lg shadow-green-500/25'
+                            : 'border-gray-400 dark:border-gray-500 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 group-hover:scale-110'
                         }`}
                       >
-                        {item.checked && <Check className="w-3 h-3 text-white" />}
+                        {item.checked && <Check className="w-4 h-4 text-white" />}
                       </button>
                       <span
-                        className={`flex-1 ${
+                        className={`flex-1 font-medium transition-all duration-150 ${
                           item.checked
                             ? 'line-through text-gray-500 dark:text-gray-400'
-                            : 'text-gray-900 dark:text-white'
+                            : 'text-gray-800 dark:text-white group-hover:text-gray-900 dark:group-hover:text-gray-100'
                         }`}
                       >
                         {item.name}
