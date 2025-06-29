@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Profile, getCommunityRecipes, CommunityRecipe, createCommunityRecipe, updateCommunityRecipe, deleteCommunityRecipe, checkUserContext, supabase } from '../lib/supabase'
 import { Users, Star, Clock, ChefHat, Search, Plus, Heart, X, Edit2, Trash2, Eye } from 'lucide-react'
+import RLSFixModal from './RLSFixModal'
 
 interface CommunityRecipesProps {
   profile: Profile
@@ -21,6 +22,8 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<CommunityRecipe | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [showRLSFix, setShowRLSFix] = useState(false)
+  const [rlsErrorMessage, setRlsErrorMessage] = useState<string>('')
 
   // Form state for sharing recipe
   const [formData, setFormData] = useState({
@@ -310,14 +313,24 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
     } catch (error) {
       console.error('Error deleting recipe:', error)
       
-      // Handle specific error messages
+      // Handle specific RLS/policy error messages
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete recipe. Please try again.'
-      setShareError(errorMessage)
       
-      // Clear error message after 5 seconds
-      setTimeout(() => {
-        setShareError(null)
-      }, 5000)
+      // Check if this is an RLS policy error
+      if (errorMessage.includes('Row Level Security') || 
+          errorMessage.includes('policy') || 
+          errorMessage.includes('permission denied') ||
+          errorMessage.includes('IMPROVED_RLS_FIX.sql')) {
+        setRlsErrorMessage(errorMessage)
+        setShowRLSFix(true)
+      } else {
+        setShareError(errorMessage)
+        
+        // Clear error message after 5 seconds
+        setTimeout(() => {
+          setShareError(null)
+        }, 5000)
+      }
     } finally {
       setDeleting(null)
     }
@@ -1109,6 +1122,13 @@ export function CommunityRecipes({ profile }: CommunityRecipesProps) {
           </div>
         </div>
       )}
+
+      {/* RLS Fix Modal */}
+      <RLSFixModal
+        isOpen={showRLSFix}
+        onClose={() => setShowRLSFix(false)}
+        errorMessage={rlsErrorMessage}
+      />
     </div>
   )
 }

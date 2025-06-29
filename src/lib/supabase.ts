@@ -759,84 +759,111 @@ export const updateCommunityRecipe = async (recipeId: string, updates: Partial<O
 export const deleteCommunityRecipe = async (recipeId: string) => {
   console.log('Attempting to delete recipe:', recipeId)
   
-  // Get current user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError) {
-    console.error('Auth error:', authError)
-    throw new Error('Authentication failed')
-  }
-  if (!user) {
-    throw new Error('User not authenticated')
-  }
+  try {
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError) {
+      console.error('Auth error:', authError)
+      throw new Error('Authentication failed')
+    }
+    if (!user) {
+      throw new Error('User not authenticated')
+    }
 
-  console.log('Current user ID:', user.id)
+    console.log('Authenticated user:', user.id)
 
-  // First verify the user owns this recipe
-  const { data: recipe, error: fetchError } = await supabase
-    .from('community_recipes')
-    .select('user_id, title')
-    .eq('id', recipeId)
-    .single()
-
-  if (fetchError) {
-    console.error('Error fetching recipe:', fetchError)
-    throw new Error('Recipe not found')
-  }
-
-  console.log('Recipe found:', recipe.title)
-  console.log('Recipe owner ID:', recipe.user_id)
-  console.log('Current user ID:', user.id)
-  console.log('IDs match?', recipe.user_id === user.id)
-  console.log('Recipe owner type:', typeof recipe.user_id)
-  console.log('Current user type:', typeof user.id)
-
-  if (recipe.user_id !== user.id) {
-    console.error('User does not own this recipe. Recipe owner:', recipe.user_id, 'Current user:', user.id)
-    throw new Error('You can only delete your own recipes')
-  }
-
-  // Get the auth UID for comparison
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  console.log('Auth UID:', authUser?.id)
-
-  // Try the delete operation with detailed logging
-  console.log('Attempting delete...')
-  const { data, error, count } = await supabase
-    .from('community_recipes')
-    .delete({ count: 'exact' })
-    .eq('id', recipeId)
-
-  console.log('Delete query executed')
-  console.log('Error:', error)
-  console.log('Count:', count)
-  console.log('Data:', data)
-
-  if (error) {
-    console.error('Delete error details:', error)
-    throw new Error(`Delete failed: ${error.message}`)
-  }
-
-  if (count === 0) {
-    // Check if the recipe still exists
-    const { data: stillExists, error: checkError } = await supabase
+    // First check if recipe exists and user owns it
+    const { data: recipe, error: fetchError } = await supabase
       .from('community_recipes')
       .select('id, user_id, title')
       .eq('id', recipeId)
       .single()
-    
-    console.log('Recipe check after failed delete:', stillExists)
-    console.log('Check error:', checkError)
-    
-    if (stillExists) {
-      throw new Error('Recipe still exists after delete attempt. This might be a Row Level Security (RLS) policy issue. Please check that your user ID matches the recipe owner ID.')
-    } else {
-      console.log('Recipe no longer exists, delete may have succeeded despite count=0')
-      return { deletedCount: 1, data: null }
-    }
-  }
 
-  console.log('Delete successful, affected rows:', count)
-  return { deletedCount: count, data }
+    if (fetchError) {
+      console.error('Error fetching recipe:', fetchError)
+      
+      if (fetchError.code === 'PGRST116') {
+        throw new Error('Recipe not found')
+      }
+      
+      // Check for RLS policy issues
+      if (fetchError.message?.includes('permission denied') || 
+          fetchError.message?.includes('insufficient privilege') ||
+          fetchError.message?.includes('row-level security')) {
+        throw new Error(`Database permission error: ${fetchError.message}. You may need to run the IMPROVED_RLS_FIX.sql script.`)
+      }
+      
+      throw new Error(`Failed to fetch recipe: ${fetchError.message}`)
+    }
+
+    console.log('Recipe found:', recipe.title)
+    console.log('Recipe owner ID:', recipe.user_id)
+    console.log('Current user ID:', user.id)
+    console.log('IDs match?', recipe.user_id === user.id)
+
+    if (recipe.user_id !== user.id) {
+      console.error('User does not own this recipe. Recipe owner:', recipe.user_id, 'Current user:', user.id)
+      throw new Error('You can only delete your own recipes')
+    }
+
+    // Attempt deletion with better error handling
+    const { data, error, count } = await supabase
+      .from('community_recipes')
+      .delete({ count: 'exact' })
+      .eq('id', recipeId)
+
+    console.log('Delete response - error:', error)
+    console.log('Delete response - count:', count)
+    console.log('Delete response - data:', data)
+
+    if (error) {
+      console.error('Database error during delete:', error)
+      
+      // Check for specific RLS policy issues
+      if (error.message?.includes('permission denied') || 
+          error.message?.includes('insufficient privilege') ||
+          error.message?.includes('row-level security') ||
+          error.message?.includes('policy')) {
+        throw new Error(`Row Level Security policy error: ${error.message}. Please run the IMPROVED_RLS_FIX.sql script in your Supabase SQL Editor to fix recipe deletion permissions.`)
+      }
+      
+      throw new Error(`Failed to delete recipe: ${error.message}`)
+    }
+
+    if (count === 0) {
+      console.log('Delete returned count=0, checking if recipe still exists...')
+      
+      // Check if the recipe still exists
+      const { data: stillExists, error: checkError } = await supabase
+        .from('community_recipes')
+        .select('id, user_id, title')
+        .eq('id', recipeId)
+        .single()
+      
+      console.log('Recipe check after failed delete:', stillExists)
+      console.log('Check error:', checkError)
+      
+      if (stillExists) {
+        throw new Error('Recipe still exists after delete attempt. This is likely a Row Level Security (RLS) policy issue. Please run the IMPROVED_RLS_FIX.sql script in your Supabase SQL Editor to fix deletion permissions.')
+      } else {
+        console.log('Recipe no longer exists, delete may have succeeded despite count=0')
+        return { deletedCount: 1, data: null }
+      }
+    }
+
+    console.log('Delete successful, affected rows:', count)
+    return { deletedCount: count, data }
+    
+  } catch (error) {
+    console.error('Error in deleteCommunityRecipe:', error)
+    
+    // Re-throw with additional context if it's an RLS issue
+    if (error instanceof Error && error.message.includes('policy')) {
+      throw new Error(`${error.message}\n\nTo fix this, please:\n1. Open your Supabase dashboard\n2. Go to SQL Editor\n3. Run the IMPROVED_RLS_FIX.sql script\n4. Try deleting the recipe again`)
+    }
+    
+    throw error
+  }
 }
 
 // Temporary function to test deletion without RLS (for debugging only)
