@@ -18,9 +18,10 @@ interface DashboardProps {
   user: any
   profile: Profile
   onSignOut: () => void
+  onProfileUpdate?: (profile: Profile) => void
 }
 
-export function Dashboard({ user, profile: initialProfile, onSignOut }: DashboardProps) {
+export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileUpdate }: DashboardProps) {
   const [activeTab, setActiveTab] = useState('chat')
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [theme, setTheme] = useState<'light' | 'dark'>(initialProfile.theme)
@@ -42,6 +43,16 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
     // Update last login on dashboard load (fire and forget)
     updateLastLogin(user.id).catch(console.error)
   }, [theme, user.id])
+
+  // Sync local profile state when parent profile changes
+  useEffect(() => {
+    console.log('Dashboard receiving profile update:', {
+      profile_photo_url: initialProfile.profile_photo_url,
+      full_name: initialProfile.full_name
+    })
+    setProfile(initialProfile)
+    setTheme(initialProfile.theme)
+  }, [initialProfile])
 
   const toggleTheme = async () => {
     if (updating) return // Prevent multiple simultaneous updates
@@ -80,6 +91,10 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
   const handleProfileUpdate = (updatedProfile: Profile) => {
     setProfile(updatedProfile)
     setTheme(updatedProfile.theme)
+    // Propagate the update to the App component
+    if (onProfileUpdate) {
+      onProfileUpdate(updatedProfile)
+    }
   }
 
   const tabs = [
@@ -124,8 +139,36 @@ export function Dashboard({ user, profile: initialProfile, onSignOut }: Dashboar
           <div className="flex items-center justify-between h-16 w-full">
             {/* Left Section - Logo and Brand */}
             <div className="flex items-center flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-blue-500/25">
-                <span className="text-white font-bold text-lg">N</span>
+              {/* Profile Photo */}
+              <div className="w-10 h-10 rounded-xl mr-3 shadow-lg shadow-blue-500/25 overflow-hidden relative">
+                {profile.profile_photo_url ? (
+                  <img 
+                    src={profile.profile_photo_url} 
+                    alt={profile.full_name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      console.error('Profile photo failed to load:', profile.profile_photo_url)
+                      // Hide the broken image and show fallback
+                      e.currentTarget.style.display = 'none'
+                      const parent = e.currentTarget.parentElement
+                      const fallback = parent?.querySelector('.fallback-avatar') as HTMLElement
+                      if (fallback) {
+                        fallback.style.display = 'flex'
+                      }
+                    }}
+                  />
+                ) : null}
+                <div 
+                  className={`fallback-avatar absolute inset-0 w-full h-full bg-gradient-to-r from-blue-500 to-emerald-500 flex items-center justify-center ${
+                    profile.profile_photo_url ? 'hidden' : 'flex'
+                  }`}
+                >
+                  <span className="text-white font-bold text-lg">
+                    {profile.full_name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800 dark:text-white">NutriAI</h1>

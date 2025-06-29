@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { supabase, Profile } from '../lib/supabase'
+import React, { useState } from 'react'
+import { supabase, Profile, uploadProfilePhoto, updateProfilePhoto } from '../lib/supabase'
+import { StorageSetupModal } from './StorageSetupModal'
 import { 
   Settings as SettingsIcon, User, Bell, Shield, Palette, 
-  Save, Moon, Sun, Check, X, AlertCircle 
+  Save, Moon, Sun, Check, X, AlertCircle, Camera 
 } from 'lucide-react'
 
 interface SettingsProps {
@@ -30,6 +31,80 @@ export function Settings({ user, profile, onProfileUpdate, onClose }: SettingsPr
 
   const [notificationPrefs, setNotificationPrefs] = useState(profile.notification_preferences)
   const [theme, setTheme] = useState<'light' | 'dark'>(profile.theme)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [showStorageSetup, setShowStorageSetup] = useState(false)
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be less than 5MB')
+      return
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file')
+      return
+    }
+
+    setUploadingPhoto(true)
+    setError('')
+    setMessage('')
+
+    try {
+      // Upload photo to storage
+      const photoUrl = await uploadProfilePhoto(user.id, file)
+      console.log('Uploaded photo URL:', photoUrl)
+      
+      // Update profile with new photo URL
+      await updateProfilePhoto(user.id, photoUrl)
+      console.log('Updated profile with photo URL')
+
+      // Create updated profile object
+      const updatedProfile = { ...profile, profile_photo_url: photoUrl }
+      console.log('Settings: Created updated profile object:', {
+        old_photo_url: profile.profile_photo_url,
+        new_photo_url: photoUrl,
+        updated_profile_photo_url: updatedProfile.profile_photo_url
+      })
+      
+      // Update local state immediately
+      onProfileUpdate(updatedProfile)
+      
+      // Fetch updated profile to ensure database sync (don't wait for this)
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+        .then(({ data: freshProfile, error: fetchError }) => {
+          if (fetchError) {
+            console.error('Error fetching updated profile:', fetchError)
+          } else if (freshProfile) {
+            // Only update if the fresh data is different
+            if (freshProfile.profile_photo_url !== updatedProfile.profile_photo_url) {
+              onProfileUpdate(freshProfile)
+            }
+          }
+        })
+      
+      setMessage('Profile photo updated successfully!')
+    } catch (error: any) {
+      console.error('Photo upload error:', error)
+      if (error.message?.includes('Storage bucket not configured') || 
+          error.message?.includes('Bucket not found') ||
+          error.message?.includes('Database setup required')) {
+        setShowStorageSetup(true)
+      } else {
+        setError(error.message || 'Failed to upload photo')
+      }
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
 
   const handleSaveProfile = async () => {
     setLoading(true)
@@ -207,6 +282,71 @@ export function Settings({ user, profile, onProfileUpdate, onClose }: SettingsPr
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Profile Information</h3>
+                  
+                  {/* Profile Photo Section */}
+                  <div className="mb-6 p-6 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Profile Photo</h4>
+                    <div className="flex items-center space-x-6">
+                      {/* Current Photo */}
+                      <div className="w-20 h-20 rounded-xl overflow-hidden shadow-lg relative">
+                        {profile.profile_photo_url ? (
+                          <img 
+                            src={profile.profile_photo_url} 
+                            alt={profile.full_name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
+                            onError={(e) => {
+                              console.error('Profile photo failed to load in settings:', profile.profile_photo_url)
+                              // Hide the broken image and show fallback
+                              e.currentTarget.style.display = 'none'
+                              const parent = e.currentTarget.parentElement
+                              const fallback = parent?.querySelector('.fallback-avatar') as HTMLElement
+                              if (fallback) {
+                                fallback.style.display = 'flex'
+                              }
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className={`fallback-avatar absolute inset-0 w-full h-full bg-gradient-to-r from-blue-500 to-emerald-500 flex items-center justify-center ${
+                            profile.profile_photo_url ? 'hidden' : 'flex'
+                          }`}
+                        >
+                          <span className="text-white font-bold text-2xl">
+                            {profile.full_name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Upload Button */}
+                      <div>
+                        <label className="cursor-pointer inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-50">
+                          {uploadingPhoto ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="w-4 h-4 mr-2" />
+                              Change Photo
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoUpload}
+                            className="hidden"
+                            disabled={uploadingPhoto}
+                          />
+                        </label>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          JPG, PNG or GIF. Max 5MB.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -474,6 +614,12 @@ export function Settings({ user, profile, onProfileUpdate, onClose }: SettingsPr
           </div>
         </div>
       </div>
+      
+      {/* Storage Setup Modal */}
+      <StorageSetupModal 
+        isOpen={showStorageSetup} 
+        onClose={() => setShowStorageSetup(false)} 
+      />
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { supabase, saveUserPreferences } from '../lib/supabase'
+import { supabase, saveUserPreferences, uploadProfilePhoto } from '../lib/supabase'
 import DatabaseSetup from './DatabaseSetup'
+import { StorageSetupModal } from './StorageSetupModal'
 import { 
   User, Target, Utensils, Globe, Calculator, AlertCircle, 
   Heart, Activity, Moon, Droplets, FileText, Shield,
   Zap, Coffee, Sparkles, TrendingUp, TrendingDown, 
-  Minus, Dumbbell, Scale
+  Minus, Dumbbell, Scale, Camera
 } from 'lucide-react'
 
 interface ProfileSetupProps {
@@ -18,6 +19,7 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
   const [showDatabaseSetup, setShowDatabaseSetup] = useState(false)
   const [formData, setFormData] = useState({
     full_name: '',
+    profile_photo_url: '',
     age: '',
     gender: 'male' as 'male' | 'female' | 'other',
     height: '',
@@ -37,6 +39,8 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(propError || '')
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [showStorageSetup, setShowStorageSetup] = useState(false)
 
   // Check if we need to show database setup modal
   useEffect(() => {
@@ -145,6 +149,45 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
     { value: 'very_active', label: 'Very Active (Hard exercise 6-7 days/week)' }
   ]
 
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be less than 5MB')
+      return
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file')
+      return
+    }
+
+    setUploadingPhoto(true)
+    setError('')
+
+    try {
+      // Upload photo to storage
+      const photoUrl = await uploadProfilePhoto(userId, file)
+      
+      // Update form data with photo URL
+      setFormData(prev => ({ ...prev, profile_photo_url: photoUrl }))
+    } catch (error: any) {
+      console.error('Photo upload error:', error)
+      if (error.message?.includes('Storage bucket not configured') || 
+          error.message?.includes('Bucket not found') ||
+          error.message?.includes('Database setup required')) {
+        setShowStorageSetup(true)
+      } else {
+        setError(error.message || 'Failed to upload photo')
+      }
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -169,6 +212,7 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
       const basicProfileData = {
         user_id: userId,
         full_name: formData.full_name,
+        profile_photo_url: formData.profile_photo_url || null,
         age: parseInt(formData.age),
         gender: formData.gender,
         height: parseInt(formData.height),
@@ -331,6 +375,70 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
                 <User className="w-6 h-6 mr-3 text-blue-500" />
                 Basic Information
               </h3>
+              
+              {/* Profile Photo Section */}
+              <div className="mb-8 p-6 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                  <Camera className="w-5 h-5 mr-2 text-blue-500" />
+                  Profile Photo (Optional)
+                </h4>
+                <div className="flex items-center space-x-6">
+                  {/* Preview */}
+                  <div className="w-24 h-24 rounded-xl overflow-hidden shadow-lg">
+                    {formData.profile_photo_url ? (
+                      <img 
+                        src={formData.profile_photo_url} 
+                        alt="Profile preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Profile photo failed to load in setup:', formData.profile_photo_url)
+                          // Hide the broken image and show fallback
+                          e.currentTarget.style.display = 'none'
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div 
+                      className={`w-full h-full bg-gradient-to-r from-blue-500 to-emerald-500 flex items-center justify-center ${
+                        formData.profile_photo_url ? 'hidden' : ''
+                      }`}
+                    >
+                      <span className="text-white font-bold text-2xl">
+                        {formData.full_name ? formData.full_name.charAt(0).toUpperCase() : '?'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Upload Button */}
+                  <div>
+                    <label className="cursor-pointer inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-50">
+                      {uploadingPhoto ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-4 h-4 mr-2" />
+                          {formData.profile_photo_url ? 'Change Photo' : 'Add Photo'}
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        disabled={uploadingPhoto}
+                      />
+                    </label>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                      JPG, PNG or GIF. Max 5MB.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -744,6 +852,12 @@ export function ProfileSetup({ userId, onProfileComplete, error: propError }: Pr
       {showDatabaseSetup && (
         <DatabaseSetup onClose={() => setShowDatabaseSetup(false)} />
       )}
+      
+      {/* Storage Setup Modal */}
+      <StorageSetupModal 
+        isOpen={showStorageSetup} 
+        onClose={() => setShowStorageSetup(false)} 
+      />
     </div>
   )
 }

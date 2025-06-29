@@ -131,6 +131,30 @@ function App() {
     }
   }
 
+  const handleProfileUpdate = async (updatedProfile: Profile) => {
+    console.log('App: Received profile update:', {
+      profile_photo_url: updatedProfile.profile_photo_url,
+      full_name: updatedProfile.full_name
+    })
+    setProfile(updatedProfile)
+    // Optionally refresh from database to ensure consistency
+    if (user) {
+      try {
+        const freshProfile = await getCompleteProfile(user.id)
+        if (freshProfile) {
+          console.log('App: Refreshed profile from database:', {
+            profile_photo_url: freshProfile.profile_photo_url,
+            full_name: freshProfile.full_name
+          })
+          setProfile(freshProfile)
+        }
+      } catch (error) {
+        console.error('Error refreshing profile after update:', error)
+        // Keep the updated profile even if refresh fails
+      }
+    }
+  }
+
   // Show loading until initialized
   if (!isInitialized || appState === 'loading') {
     return (
@@ -168,6 +192,7 @@ function App() {
         user={user}
         profile={profile}
         onSignOut={handleSignOut}
+        onProfileUpdate={handleProfileUpdate}
       />
     )
   }

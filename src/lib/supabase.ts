@@ -14,6 +14,7 @@ export type Profile = {
   id: string
   user_id: string
   full_name: string
+  profile_photo_url?: string
   age: number
   gender: 'male' | 'female' | 'other'
   height: number
@@ -348,10 +349,10 @@ export const saveUserPreferences = async (
 
 // Helper function to get complete profile with preferences
 export const getCompleteProfile = async (userId: string): Promise<Profile | null> => {
-  // Get basic profile
+  // Get basic profile including profile_photo_url
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id,user_id,full_name,age,gender,height,weight,goal,activity_level,sleep_hours,water_goal_ltr,notes,calorie_target,protein_target,theme,points,level,streak_days,last_login,notification_preferences,created_at')
+    .select('id,user_id,full_name,profile_photo_url,age,gender,height,weight,goal,activity_level,sleep_hours,water_goal_ltr,notes,calorie_target,protein_target,theme,points,level,streak_days,last_login,notification_preferences,created_at')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -1020,5 +1021,105 @@ const updateRecipeRating = async (recipeId: string) => {
         rating_count: count
       })
       .eq('id', recipeId)
+  }
+}
+
+// Profile photo upload function
+export const uploadProfilePhoto = async (userId: string, file: File): Promise<string> => {
+  try {
+    // Create a unique filename with cleaner naming
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const timestamp = Date.now()
+    const fileName = `${userId}_${timestamp}.${fileExt}`
+    const filePath = fileName
+
+    // First, try to upload to profile-photos bucket
+    let bucketName = 'profile-photos'
+    
+    // Try uploading to profile-photos bucket first
+    let { error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.type,
+        duplex: 'half'
+      })
+
+    // If bucket doesn't exist, try to use 'avatars' bucket (common default)
+    if (uploadError && uploadError.message?.includes('Bucket not found')) {
+      bucketName = 'avatars'
+      const { error: avatarsError } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type,
+          duplex: 'half'
+        })
+      
+      if (avatarsError && avatarsError.message?.includes('Bucket not found')) {
+        // If no bucket exists, throw a helpful error
+        throw new Error('Storage bucket not configured. Please create a "profile-photos" or "avatars" bucket in your Supabase dashboard under Storage.')
+      } else if (avatarsError) {
+        throw avatarsError
+      }
+    } else if (uploadError) {
+      throw uploadError
+    }
+
+    // Get public URL with better error handling
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath)
+
+    // Validate the URL before returning
+    if (!publicUrl || publicUrl.includes('undefined')) {
+      throw new Error('Failed to generate valid image URL')
+    }
+
+    // Add timestamp to URL to prevent caching issues
+    const urlWithCacheBuster = `${publicUrl}?t=${timestamp}`
+    
+    console.log('Generated public URL:', urlWithCacheBuster)
+    return urlWithCacheBuster
+  } catch (error) {
+    console.error('Error uploading profile photo:', error)
+    throw error
+  }
+}
+
+// Update profile photo URL
+export const updateProfilePhoto = async (userId: string, photoUrl: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ profile_photo_url: photoUrl })
+      .eq('user_id', userId)
+
+    if (error) {
+      if (error.code === 'PGRST204' && error.message.includes('profile_photo_url')) {
+        throw new Error('Database setup required: The profile_photo_url column does not exist. Please run the database migration.')
+      }
+      throw error
+    }
+  } catch (error) {
+    console.error('Error updating profile photo:', error)
+    throw error
+  }
+}
+
+// Remove profile photo
+export const removeProfilePhoto = async (userId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ profile_photo_url: null })
+      .eq('user_id', userId)
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error removing profile photo:', error)
+    throw error
   }
 }
