@@ -472,6 +472,54 @@ export const saveGroceryList = async (userId: string, listData: Omit<GroceryList
   return data
 }
 
+export const getUserGroceryLists = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('grocery_lists')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data as GroceryList[]
+}
+
+export const getActiveGroceryList = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('grocery_lists')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows returned
+  return data as GroceryList | null
+}
+
+export const updateGroceryList = async (listId: string, updates: Partial<Omit<GroceryList, 'id' | 'user_id' | 'created_at'>>) => {
+  const { data, error } = await supabase
+    .from('grocery_lists')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', listId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as GroceryList
+}
+
+export const deleteGroceryList = async (listId: string) => {
+  const { error } = await supabase
+    .from('grocery_lists')
+    .delete()
+    .eq('id', listId)
+
+  if (error) throw error
+}
+
 export const saveMealPlan = async (userId: string, planData: Omit<MealPlan, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
   const { data, error } = await supabase
     .from('meal_plans')

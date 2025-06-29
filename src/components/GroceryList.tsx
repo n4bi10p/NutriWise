@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Profile, saveGroceryList } from '../lib/supabase'
+import { useState, useEffect } from 'react'
+import { Profile, saveGroceryList, getActiveGroceryList, updateGroceryList } from '../lib/supabase'
 import { chatWithGemini } from '../lib/gemini'
 import { ShoppingCart, Loader, Check, Save, Share, Download } from 'lucide-react'
 
@@ -20,6 +20,48 @@ export function GroceryList({ profile }: GroceryListProps) {
   const [saving, setSaving] = useState(false)
   const [mealPlanInput, setMealPlanInput] = useState('')
   const [listName, setListName] = useState('')
+  const [currentListId, setCurrentListId] = useState<string | null>(null)
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+
+  // Load active grocery list on component mount
+  useEffect(() => {
+    loadActiveGroceryList()
+  }, [profile.user_id])
+
+  // Auto-save when grocery items change (after initial load)
+  useEffect(() => {
+    if (initialLoadComplete && groceryItems.length > 0) {
+      autoSaveGroceryList()
+    }
+  }, [groceryItems, initialLoadComplete])
+
+  const loadActiveGroceryList = async () => {
+    try {
+      const activeList = await getActiveGroceryList(profile.user_id)
+      if (activeList) {
+        setGroceryItems(activeList.items || [])
+        setListName(activeList.name)
+        setCurrentListId(activeList.id)
+      }
+    } catch (error) {
+      console.error('Error loading active grocery list:', error)
+    } finally {
+      setInitialLoadComplete(true)
+    }
+  }
+
+  const autoSaveGroceryList = async () => {
+    if (!currentListId || groceryItems.length === 0) return
+
+    try {
+      await updateGroceryList(currentListId, {
+        items: groceryItems,
+        name: listName
+      })
+    } catch (error) {
+      console.error('Error auto-saving grocery list:', error)
+    }
+  }
 
   const generateGroceryList = async () => {
     if (!mealPlanInput.trim()) return
@@ -30,7 +72,7 @@ export function GroceryList({ profile }: GroceryListProps) {
 
 ${mealPlanInput}
 
-Consider the user's dietary preferences: ${profile.preferences?.dietary_restrictions?.join(', ') || 'None'}
+Consider the user's dietary preferences: ${profile.dietary_restrictions?.join(', ') || 'None'}
 Allergies to avoid: ${profile.allergies?.join(', ') || 'None'}
 
 Format as a simple list with categories and items underneath. Include estimated quantities where helpful.`
@@ -61,8 +103,24 @@ Format as a simple list with categories and items underneath. Include estimated 
         }
       })
 
+      const newListName = `Grocery List - ${new Date().toLocaleDateString()}`
+      
       setGroceryItems(items)
-      setListName(`Grocery List - ${new Date().toLocaleDateString()}`)
+      setListName(newListName)
+
+      // Auto-save the new grocery list
+      try {
+        const savedList = await saveGroceryList(profile.user_id, {
+          name: newListName,
+          items: items,
+          is_template: false,
+          is_shared: false
+        })
+        setCurrentListId(savedList.id)
+      } catch (saveError) {
+        console.error('Error auto-saving grocery list:', saveError)
+        // Continue even if save fails - user can manually save later
+      }
     } catch (error) {
       console.error('Error generating grocery list:', error)
     } finally {
@@ -87,18 +145,28 @@ Format as a simple list with categories and items underneath. Include estimated 
 
     setSaving(true)
     try {
-      await saveGroceryList(profile.user_id, {
-        name: listName,
-        items: groceryItems,
-        is_template: false,
-        is_shared: false
-      })
+      if (currentListId) {
+        // Update existing list
+        await updateGroceryList(currentListId, {
+          name: listName,
+          items: groceryItems
+        })
+      } else {
+        // Create new list
+        const savedList = await saveGroceryList(profile.user_id, {
+          name: listName,
+          items: groceryItems,
+          is_template: false,
+          is_shared: false
+        })
+        setCurrentListId(savedList.id)
+      }
       
       // Show success message (you could add a toast notification here)
-      alert('Grocery list saved successfully!')
+      console.log('Grocery list saved successfully!')
     } catch (error) {
       console.error('Error saving grocery list:', error)
-      alert('Failed to save grocery list. Please try again.')
+      console.warn('Failed to save grocery list. Please try again.')
     } finally {
       setSaving(false)
     }

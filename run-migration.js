@@ -21,10 +21,10 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 async function runMigration() {
   try {
-    console.log('Running migration to update goal constraint...')
+    console.log('Running migration to fix grocery lists RLS policies...')
     
     // Read the migration file
-    const migrationPath = resolve('./supabase/migrations/20250628140000_update_goal_constraint.sql')
+    const migrationPath = resolve('./supabase/migrations/20250628140005_fix_grocery_lists_rls.sql')
     const migrationSQL = readFileSync(migrationPath, 'utf8')
     
     // Extract just the SQL commands (remove comments)
