@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Profile, getUserAchievements, getAvailableAchievements, UserAchievement, Achievement } from '../lib/supabase'
 import { Award, Star, Trophy, Target, Users, Calendar, Zap, Lock } from 'lucide-react'
 
@@ -10,6 +10,7 @@ export function Achievements({ profile }: AchievementsProps) {
   const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([])
   const [availableAchievements, setAvailableAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'earned' | 'available'>('earned')
 
   useEffect(() => {
@@ -18,15 +19,26 @@ export function Achievements({ profile }: AchievementsProps) {
 
   const loadAchievements = async () => {
     try {
+      setError(null)
       const [earned, available] = await Promise.all([
         getUserAchievements(profile.user_id),
         getAvailableAchievements()
       ])
       
+      console.log('Loaded achievements:', { earned, available })
       setUserAchievements(earned)
       setAvailableAchievements(available)
+      
+      // If no achievements are available, it might be a database issue
+      if (!available || available.length === 0) {
+        setError('Achievements data not found. Please ensure the database migration has been applied.')
+      }
     } catch (error) {
       console.error('Error loading achievements:', error)
+      setError('Failed to load achievements. This might be due to missing database tables or RLS policies.')
+      // If achievements table doesn't exist, create empty arrays to prevent errors
+      setUserAchievements([])
+      setAvailableAchievements([])
     } finally {
       setLoading(false)
     }
@@ -66,6 +78,36 @@ export function Achievements({ profile }: AchievementsProps) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
+        <div className="flex items-center mb-4">
+          <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl flex items-center justify-center mr-3">
+            <Trophy className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Achievements</h2>
+            <p className="text-sm text-red-600 dark:text-red-400">Database Setup Required</p>
+          </div>
+        </div>
+        
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-4">
+          <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+        </div>
+        
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+          <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">To fix this:</h3>
+          <ol className="text-blue-800 dark:text-blue-200 text-sm space-y-1 list-decimal list-inside">
+            <li>Run the complete migration SQL in your Supabase dashboard</li>
+            <li>Ensure the achievements table is created and populated</li>
+            <li>Verify RLS policies are correctly applied</li>
+            <li>Refresh the page to try again</li>
+          </ol>
+        </div>
       </div>
     )
   }
@@ -169,8 +211,6 @@ export function Achievements({ profile }: AchievementsProps) {
         })}
 
         {activeTab === 'available' && lockedAchievements.map((achievement) => {
-          const IconComponent = getIconComponent(achievement.icon)
-          
           return (
             <div key={achievement.id} className="bg-white/5 backdrop-blur-md border border-white/10 shadow-xl rounded-2xl p-6 opacity-75 hover:opacity-90 transition-opacity duration-200">
               <div className="flex items-start justify-between mb-4">
