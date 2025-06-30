@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Profile } from '../lib/supabase'
 import { analyzeMenu, analyzeMenuWithImage } from '../lib/gemini'
 import { Search, Loader, Upload, Camera, X, Image as ImageIcon, Sparkles } from 'lucide-react'
@@ -17,6 +17,13 @@ interface RecommendedDish {
   benefits?: string;
 }
 
+interface MenuAnalyzerState {
+  menu: string;
+  analysis: string;
+  uploadedImage: string | null;
+  recommendedDishes: RecommendedDish[];
+}
+
 export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
   const [menu, setMenu] = useState('')
   const [analysis, setAnalysis] = useState('')
@@ -24,7 +31,62 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [recommendedDishes, setRecommendedDishes] = useState<RecommendedDish[]>([])
+  const [sessionRestored, setSessionRestored] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Storage keys
+  const STORAGE_KEY = 'nutriwise-menu-analyzer-state'
+
+  // Load state from localStorage on component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem(STORAGE_KEY)
+    if (savedState) {
+      try {
+        const parsedState: MenuAnalyzerState = JSON.parse(savedState)
+        if (parsedState.menu || parsedState.analysis || parsedState.uploadedImage || parsedState.recommendedDishes?.length > 0) {
+          setMenu(parsedState.menu || '')
+          setAnalysis(parsedState.analysis || '')
+          setUploadedImage(parsedState.uploadedImage || null)
+          setRecommendedDishes(parsedState.recommendedDishes || [])
+          setSessionRestored(true)
+          console.log('📁 Restored menu analyzer state from localStorage')
+          
+          // Hide the restoration notification after 3 seconds
+          setTimeout(() => setSessionRestored(false), 3000)
+        }
+      } catch (error) {
+        console.error('❌ Failed to parse saved menu analyzer state:', error)
+        localStorage.removeItem(STORAGE_KEY)
+      }
+    }
+  }, [])
+
+  // Save state to localStorage whenever key state changes
+  useEffect(() => {
+    const stateToSave: MenuAnalyzerState = {
+      menu,
+      analysis,
+      uploadedImage,
+      recommendedDishes
+    }
+    
+    // Only save if there's meaningful data
+    if (menu || analysis || uploadedImage || recommendedDishes.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave))
+      console.log('💾 Saved menu analyzer state to localStorage')
+    }
+  }, [menu, analysis, uploadedImage, recommendedDishes])
+
+  // Clear saved state
+  const clearSession = () => {
+    localStorage.removeItem(STORAGE_KEY)
+    setMenu('')
+    setAnalysis('')
+    setUploadedImage(null)
+    setImageFile(null)
+    setRecommendedDishes([])
+    console.log('🗑️ Cleared menu analyzer session')
+  }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -194,15 +256,41 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
-        <div className="flex items-center mb-6">
-          <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mr-3">
-            <Search className="w-6 h-6 text-white" />
+      {/* Session Restored Notification */}
+      {sessionRestored && (
+        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center">
+          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
+            <Search className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Smart Menu Analyzer</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Upload a menu photo or paste text to get personalized recommendations</p>
+            <p className="text-green-400 font-medium text-sm">Session Restored</p>
+            <p className="text-green-300/80 text-xs">Your previous menu analysis has been restored</p>
           </div>
+        </div>
+      )}
+      
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mr-3">
+              <Search className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Smart Menu Analyzer</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Upload a menu photo or paste text to get personalized recommendations</p>
+            </div>
+          </div>
+          
+          {/* Clear Session Button - only show if there's saved data */}
+          {(analysis || uploadedImage || recommendedDishes.length > 0) && (
+            <button
+              onClick={clearSession}
+              className="px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-lg transition-colors duration-200 border border-red-500/30"
+              title="Clear saved session"
+            >
+              Clear Session
+            </button>
+          )}
         </div>
 
         <div className="space-y-6">
