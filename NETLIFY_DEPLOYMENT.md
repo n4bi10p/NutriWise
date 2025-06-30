@@ -28,18 +28,20 @@ git push origin main
 ### 3. Set Environment Variables
 In Netlify dashboard → Site settings → Environment variables, add:
 
-**Frontend Variables (must start with VITE_):**
+**Frontend Variables (required):**
 ```
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key  
 VITE_GEMINI_API_KEY=your_gemini_api_key
 ```
 
-**Backend Variables (for Netlify Functions):**
+**Backend Variables (for Netlify Functions - required):**
 ```
 GOOGLE_CLOUD_PROJECT_ID=your_google_cloud_project_id
 GOOGLE_CREDENTIALS_BASE64=your_base64_encoded_service_account_credentials
 ```
+
+**⚠️ Important:** Do NOT set `VITE_VERTEX_AI_API_URL` for Netlify deployment. The app will automatically use Netlify Functions.
 
 ### 4. Get Your Service Account Key (Base64)
 1. **Download your Google Cloud service account JSON file**

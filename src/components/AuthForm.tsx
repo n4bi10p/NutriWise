@@ -82,7 +82,7 @@ export function AuthForm({ onAuthSuccess, error: propError }: AuthFormProps) {
             <User className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            NutriAI
+            NutriWise
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
             Your AI-powered nutrition companion
@@ -168,20 +168,6 @@ export function AuthForm({ onAuthSuccess, error: propError }: AuthFormProps) {
             </button>
           </div>
         </form>
-
-        {/* Instructions for fixing email verification */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2">Email Verification Setup</h3>
-          <p className="text-xs text-blue-600 leading-relaxed">
-            If email verification links aren't working, please configure your Supabase project:
-            <br />
-            1. Go to Authentication → Settings in your Supabase dashboard
-            <br />
-            2. Set Site URL to: <code className="bg-blue-100 px-1 rounded">{window.location.origin}</code>
-            <br />
-            3. Add to Redirect URLs: <code className="bg-blue-100 px-1 rounded">{window.location.origin}/**</code>
-          </p>
-        </div>
       </div>
     </div>
   )

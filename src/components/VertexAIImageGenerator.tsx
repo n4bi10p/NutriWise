@@ -27,16 +27,17 @@ export function VertexAIImageGenerator({
 
   // For Netlify deployment, use the function directly
   // For local development, you can still use the separate server if needed
-  const VERTEX_AI_API_URL = import.meta.env.VITE_VERTEX_AI_API_URL || '';
+  const VERTEX_AI_API_URL = import.meta.env.VITE_VERTEX_AI_API_URL;
   
   // Determine the API endpoint
   const getApiEndpoint = () => {
-    if (VERTEX_AI_API_URL) {
-      // Use external server if URL is provided
+    // Always use Netlify function for production, unless explicitly overridden
+    if (VERTEX_AI_API_URL && !VERTEX_AI_API_URL.includes('localhost')) {
+      // Use external server if URL is provided and not localhost
       return `${VERTEX_AI_API_URL}/api/generate-food-image`;
     } else {
-      // Use Netlify function (default for production)
-      return '/api/generate-food-image';
+      // Use Netlify function (default for production and localhost fallback)
+      return '/.netlify/functions/generate-food-image';
     }
   };
 
