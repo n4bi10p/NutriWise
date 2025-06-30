@@ -25,7 +25,20 @@ export function VertexAIImageGenerator({
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  const VERTEX_AI_API_URL = import.meta.env.VITE_VERTEX_AI_API_URL || 'http://localhost:3001';
+  // For Netlify deployment, use the function directly
+  // For local development, you can still use the separate server if needed
+  const VERTEX_AI_API_URL = import.meta.env.VITE_VERTEX_AI_API_URL || '';
+  
+  // Determine the API endpoint
+  const getApiEndpoint = () => {
+    if (VERTEX_AI_API_URL) {
+      // Use external server if URL is provided
+      return `${VERTEX_AI_API_URL}/api/generate-food-image`;
+    } else {
+      // Use Netlify function (default for production)
+      return '/api/generate-food-image';
+    }
+  };
 
   // Auto-generate image when component mounts
   useEffect(() => {
@@ -48,7 +61,7 @@ export function VertexAIImageGenerator({
     try {
       console.log(`🎨 Generating AI image for: ${dishName}`);
 
-      const response = await fetch(`${VERTEX_AI_API_URL}/api/generate-food-image`, {
+      const response = await fetch(getApiEndpoint(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

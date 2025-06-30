@@ -10,8 +10,17 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// CORS configuration for production
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : true)
+    : true,
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
 // Google Cloud configuration
@@ -60,6 +69,29 @@ async function initializeAuth() {
     return false;
   }
 }
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'NutriWise Vertex AI Server',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'NutriWise Vertex AI Image Generation Server',
+    status: 'running',
+    endpoints: [
+      'GET /health - Health check',
+      'POST /api/generate-food-image - Generate food images',
+      'GET /api/test-auth - Test authentication'
+    ]
+  });
+});
 
 // Generate food image using Vertex AI Imagen
 app.post('/api/generate-food-image', async (req, res) => {

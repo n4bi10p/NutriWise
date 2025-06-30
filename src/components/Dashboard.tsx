@@ -13,6 +13,7 @@ import { Settings } from './Settings'
 import { Achievements } from './Achievements'
 import { CommunityRecipes } from './CommunityRecipes'
 import { NotificationCenter } from './NotificationCenter'
+import { BoltBadge } from './BoltBadge'
 
 interface DashboardProps {
   user: any
@@ -35,10 +36,10 @@ export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileU
     const root = document.documentElement
     if (theme === 'dark') {
       root.classList.add('dark')
-      localStorage.setItem('nutriai-theme', 'dark')
+      localStorage.setItem('nutriwise-theme', 'dark')
     } else {
       root.classList.remove('dark')
-      localStorage.setItem('nutriai-theme', 'light')
+      localStorage.setItem('nutriwise-theme', 'light')
     }
     
     // Update last login on dashboard load (fire and forget)
@@ -181,7 +182,10 @@ export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileU
                 </div>
               </div>
               <div className="min-w-0 flex-shrink">
-                <h1 className="text-base sm:text-lg lg:text-xl font-bold text-gray-800 dark:text-white truncate">NutriAI</h1>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-base sm:text-lg lg:text-xl font-bold text-gray-800 dark:text-white truncate">NutriWise</h1>
+                  <BoltBadge variant="white" size="small" className="flex-shrink-0" />
+                </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate hidden sm:block">
                   Welcome back, {profile.full_name.split(' ')[0]}!
                 </p>
@@ -272,6 +276,11 @@ export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileU
                 >
                   <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-gray-700 dark:text-gray-300 group-hover:text-red-500 group-hover:scale-110 transition-all duration-300" />
                 </button>
+                
+                {/* Bolt.new Badge - Top Right as per DevPost guidelines */}
+                <div className="hidden sm:block ml-2 flex-shrink-0">
+                  <BoltBadge variant="white" size="medium" />
+                </div>
               </div>
             </div>
           </div>

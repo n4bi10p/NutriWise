@@ -1,0 +1,19 @@
+{
+  "name": "nutriwise-vertex-ai-server",
+  "version": 1,
+  "builds": [
+    {
+      "src": "vertex-ai.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/vertex-ai.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
