@@ -152,106 +152,177 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
   const extractRecommendedDishes = (analysisText: string): RecommendedDish[] => {
     const dishes: RecommendedDish[] = []
     
-    console.log('🔍 Extracting dishes from analysis:', analysisText.substring(0, 500))
+    console.log('🔍 Extracting dishes from analysis (first 1000 chars):', analysisText.substring(0, 1000))
+    console.log('🔍 Full analysis length:', analysisText.length)
     
-    // More specific pattern to match numbered dish recommendations
-    // Look for patterns like "1. Dish Name:" or "1. Dish Name -" or "1. **Dish Name**:"
-    const dishPattern = /(?:^|\n)\s*(\d+)\.\s*(?:\*\*)?([^:\*\n]+?)(?:\*\*)?\s*[:–-]?\s*([^\n]*)/gm
+    // More precise pattern to extract only numbered dish titles
+    // Pattern: "1. Mutton Cutlet (2 pcs):" or "2. Chicken Cheese Masala Omelette:"
+    const numberedDishPattern = /(?:^|\n)\s*(\d+)\.\s*([A-Z][^:\n(]*?)(?:\s*\([^)]*\))?\s*:/gm
+    
+    console.log('🔍 Using numbered dish title pattern...')
     
     let match
-    while ((match = dishPattern.exec(analysisText)) !== null && dishes.length < 4) {
+    while ((match = numberedDishPattern.exec(analysisText)) !== null && dishes.length < 4) {
       const dishNumber = match[1]
       let dishName = match[2]?.trim()
-      let description = match[3]?.trim()
       
-      console.log(`🔍 Found potential dish ${dishNumber}: "${dishName}" with description: "${description}"`)
+      console.log(`🔍 Found numbered dish ${dishNumber}: "${dishName}"`)
       
-      if (dishName && dishName.length > 5 && dishName.length < 80) {
+      if (dishName && isValidDishName(dishName)) {
         // Clean up dish name
         dishName = dishName
           .replace(/[*_]/g, '') // Remove markdown formatting
-          .replace(/^\d+\.\s*/, '') // Remove numbering
-          .replace(/^[-–]\s*/, '') // Remove leading dashes
+          .replace(/\s+/g, ' ') // Normalize whitespace
           .trim()
         
-        // Skip if it's not a proper dish name (contains explanatory text)
-        if (dishName.toLowerCase().includes('why it fits') || 
-            dishName.toLowerCase().includes('estimated calories') ||
-            dishName.toLowerCase().includes('nutritional benefits') ||
-            dishName.toLowerCase().includes('suggested modifications') ||
-            dishName.toLowerCase().includes('this is likely') ||
-            dishName.toLowerCase().includes('protein content')) {
-          console.log(`⏭️ Skipping non-dish text: "${dishName}"`)
-          continue
+        // Additional validation - must be a proper dish name
+        if (dishName.length > 5 && dishName.length < 60 && 
+            !dishName.toLowerCase().includes('option') &&
+            !dishName.toLowerCase().includes('likely') &&
+            !dishName.toLowerCase().includes('most of') &&
+            !dishName.toLowerCase().includes('all of') &&
+            !dishName.toLowerCase().includes('various') &&
+            !dishName.toLowerCase().includes('several') &&
+            !dishName.toLowerCase().includes('many') &&
+            !dishName.toLowerCase().includes('items') &&
+            !dishName.toLowerCase().includes('dishes') &&
+            /^[A-Z]/.test(dishName)) { // Must start with capital letter
+          
+          // Check if we already have this dish
+          if (dishes.some(d => d.name.toLowerCase() === dishName.toLowerCase())) {
+            console.log(`⏭️ Skipping duplicate dish: "${dishName}"`)
+            continue
+          }
+          
+          // Determine cuisine type from dish name or profile
+          let cuisineType = profile.regional_preference?.toLowerCase() || 'indian'
+          if (dishName.toLowerCase().includes('biryani') || dishName.toLowerCase().includes('curry') || 
+              dishName.toLowerCase().includes('dal') || dishName.toLowerCase().includes('paneer') ||
+              dishName.toLowerCase().includes('murg') || dishName.toLowerCase().includes('gosht') ||
+              dishName.toLowerCase().includes('tandoori') || dishName.toLowerCase().includes('masala') ||
+              dishName.toLowerCase().includes('cutlet') || dishName.toLowerCase().includes('tikka')) {
+            cuisineType = 'indian'
+          } else if (dishName.toLowerCase().includes('greek') || dishName.toLowerCase().includes('mediterranean')) {
+            cuisineType = 'mediterranean'
+          } else if (dishName.toLowerCase().includes('prawns') || dishName.toLowerCase().includes('seafood') ||
+                     dishName.toLowerCase().includes('salmon') || dishName.toLowerCase().includes('fish')) {
+            cuisineType = 'modern'
+          } else if (dishName.toLowerCase().includes('pasta') || dishName.toLowerCase().includes('pizza')) {
+            cuisineType = 'italian'
+          } else if (dishName.toLowerCase().includes('sandwich') || dishName.toLowerCase().includes('burger')) {
+            cuisineType = 'western'
+          }
+          
+          // Create proper description based on dish name and type
+          let description = generateDishDescription(dishName, cuisineType)
+          
+          console.log(`✅ Extracted dish: "${dishName}" (${cuisineType}) with description: "${description}"`)
+          
+          dishes.push({
+            name: dishName,
+            description: description,
+            cuisineType: cuisineType
+          })
+        } else {
+          console.log(`⏭️ Skipping invalid dish name: "${dishName}"`)
         }
-        
-        // Check if we already have this dish
-        if (dishes.some(d => d.name.toLowerCase() === dishName.toLowerCase())) {
-          continue
-        }
-        
-        // Determine cuisine type from dish name or profile
-        let cuisineType = 'indian' // Default
-        if (dishName.toLowerCase().includes('biryani') || dishName.toLowerCase().includes('curry') || 
-            dishName.toLowerCase().includes('dal') || dishName.toLowerCase().includes('paneer') ||
-            dishName.toLowerCase().includes('murg') || dishName.toLowerCase().includes('gosht')) {
-          cuisineType = 'indian'
-        } else if (dishName.toLowerCase().includes('greek')) {
-          cuisineType = 'mediterranean'
-        } else if (dishName.toLowerCase().includes('prawns') || dishName.toLowerCase().includes('seafood')) {
-          cuisineType = 'modern'
-        } else if (profile.regional_preference) {
-          cuisineType = profile.regional_preference.toLowerCase()
-        }
-        
-        // Clean up description if it contains dish analysis
-        if (description && description.toLowerCase().includes('this is likely')) {
-          description = `Traditional ${cuisineType} dish with rich flavors`
-        }
-        
-        console.log(`✅ Extracted dish: "${dishName}" (${cuisineType}) with description: "${description}"`)
-        
-        dishes.push({
-          name: dishName,
-          description: description || `Traditional ${cuisineType} dish`,
-          cuisineType: cuisineType
-        })
       }
     }
     
-    console.log(`🍽️ Total dishes extracted: ${dishes.length}`, dishes)
+    console.log(`🔧 Extracted ${dishes.length} dishes using numbered pattern`)
     
-    // If we couldn't extract enough dishes from the numbered format, try to find specific dish names
+    // If no dishes found with numbered pattern, try fallback with specific dish search
     if (dishes.length === 0) {
-      console.log('⚠️ No dishes extracted from numbered format, trying specific dish name search...')
+      console.log('⚠️ No dishes extracted from numbered pattern, trying fallback search...')
       
-      // Look for common Indian dish names in the text
+      // Look for common dish names directly mentioned in the text
       const commonDishes = [
-        'Murg Matka Dum Biryani', 'Gosht Hyderabadi Dum Biryani', 'Prawns Dum Biryani',
-        'Greek Salad', 'Chicken Biryani', 'Mutton Biryani', 'Lamb Curry', 'Chicken Curry',
-        'Dal Makhani', 'Paneer Makhani', 'Butter Chicken', 'Tandoori Chicken'
+        'Mutton Cutlet', 'Chicken Cheese Masala Omelette', 'Chicken Biryani', 'Mutton Biryani',
+        'Butter Chicken', 'Tandoori Chicken', 'Dal Makhani', 'Paneer Makhani',
+        'Fish Curry', 'Prawn Curry', 'Vegetable Biryani', 'Chicken Tikka',
+        'Greek Salad', 'Caesar Salad', 'Grilled Chicken', 'Chicken Sandwich'
       ]
       
       for (const dishName of commonDishes) {
-        if (analysisText.toLowerCase().includes(dishName.toLowerCase()) && dishes.length < 4) {
+        if (analysisText.toLowerCase().includes(dishName.toLowerCase()) && dishes.length < 3) {
           let cuisineType = 'indian'
-          if (dishName.toLowerCase().includes('greek')) {
+          if (dishName.toLowerCase().includes('greek') || dishName.toLowerCase().includes('caesar')) {
             cuisineType = 'mediterranean'
-          } else if (dishName.toLowerCase().includes('prawns')) {
-            cuisineType = 'modern'
+          } else if (dishName.toLowerCase().includes('sandwich') || dishName.toLowerCase().includes('grilled')) {
+            cuisineType = 'western'
           }
           
           dishes.push({
             name: dishName,
-            description: `Traditional ${cuisineType} dish with authentic flavors`,
+            description: generateDishDescription(dishName, cuisineType),
             cuisineType: cuisineType
           })
-          console.log(`🔄 Added specific dish: ${dishName}`)
+          console.log(`🔄 Added fallback dish: ${dishName}`)
         }
       }
     }
     
+    console.log(`🍽️ Final extracted dishes (${dishes.length}):`, dishes.map(d => d.name))
+    
     return dishes
+  }
+  
+  // Generate proper description for image generation
+  const generateDishDescription = (dishName: string, cuisineType: string): string => {
+    const dishLower = dishName.toLowerCase()
+    
+    // Specific descriptions based on dish type
+    if (dishLower.includes('cutlet')) {
+      return `Golden fried ${cuisineType} cutlet with crispy coating, served hot with garnish`
+    } else if (dishLower.includes('omelette')) {
+      return `Fluffy ${cuisineType} style omelette with cheese and spices, perfectly cooked`
+    } else if (dishLower.includes('biryani')) {
+      return `Aromatic basmati rice layered with spiced meat and traditional ${cuisineType} seasonings`
+    } else if (dishLower.includes('curry')) {
+      return `Rich and creamy ${cuisineType} curry with traditional spices and fresh herbs`
+    } else if (dishLower.includes('tandoori')) {
+      return `Clay oven roasted ${cuisineType} dish with smoky flavor and vibrant spices`
+    } else if (dishLower.includes('masala')) {
+      return `Spiced ${cuisineType} dish with aromatic masala and traditional cooking`
+    } else if (dishLower.includes('grilled')) {
+      return `Perfectly grilled dish with char marks and ${cuisineType} marinade`
+    } else if (dishLower.includes('sandwich')) {
+      return `Fresh ${cuisineType} style sandwich with crispy bread and flavorful fillings`
+    } else if (dishLower.includes('salad')) {
+      return `Fresh and colorful ${cuisineType} salad with crisp vegetables and dressing`
+    } else {
+      return `Traditional ${cuisineType} dish prepared with authentic spices and fresh ingredients`
+    }
+  }
+
+  // Validate if a string is a proper dish name
+  const isValidDishName = (name: string): boolean => {
+    if (!name || name.length < 3 || name.length > 100) return false
+    
+    // Must start with a capital letter
+    if (!/^[A-Z]/.test(name)) return false
+    
+    // Should not contain explanatory phrases
+    const invalidPhrases = [
+      'this appears', 'this is', 'it appears', 'seems to be', 'likely to be',
+      'appears to be', 'description', 'analysis', 'estimated', 'approximately',
+      'nutritional', 'calories', 'protein content', 'why it fits', 'benefits',
+      'most of', 'all of', 'various', 'several', 'many', 'items', 'dishes',
+      'options', 'bakery items', 'the bakery', 'cream roll', 'jam roll'
+    ]
+    
+    const nameLower = name.toLowerCase()
+    
+    // Check for invalid phrases
+    if (invalidPhrases.some(phrase => nameLower.includes(phrase))) return false
+    
+    // Must contain alphabetic characters (not just numbers and symbols)
+    if (!/[a-zA-Z]{3,}/.test(name)) return false
+    
+    // Should not be a generic description
+    if (nameLower === 'dish' || nameLower === 'food' || nameLower === 'meal') return false
+    
+    return true
   }
 
   return (
@@ -401,43 +472,46 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recommendedDishes.map((dish, index) => (
-              <div key={`${dish.name}-${index}`} className="space-y-3">
-                <VertexAIImageGenerator
-                  dishName={dish.name}
-                  description={dish.description}
-                  cuisineType={dish.cuisineType || 'modern'}
-                  plating="elegant"
-                  className="w-full"
-                  onImageGenerated={(imageUrl) => {
-                    console.log(`✅ Generated image for ${dish.name}:`, imageUrl)
-                  }}
-                  onError={(error) => {
-                    console.error(`❌ Failed to generate image for ${dish.name}:`, error)
-                  }}
-                />
-                
-                {/* Dish Details */}
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-3">
-                  <h4 className="font-medium text-gray-900 dark:text-white text-sm">
-                    {dish.name}
-                  </h4>
-                  {dish.description && (
-                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                      {dish.description}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-purple-400 font-medium">
-                      {dish.cuisineType} Style
-                    </span>
-                    <span className="text-xs text-green-400">
-                      ✅ Recommended
-                    </span>
+            {recommendedDishes.map((dish, index) => {
+              console.log(`🖼️ Rendering image for dish: "${dish.name}" with description: "${dish.description}" (${dish.cuisineType})`)
+              return (
+                <div key={`${dish.name}-${index}`} className="space-y-3">
+                  <VertexAIImageGenerator
+                    dishName={dish.name}
+                    description={dish.description}
+                    cuisineType={dish.cuisineType || 'modern'}
+                    plating="elegant"
+                    className="w-full"
+                    onImageGenerated={(imageUrl) => {
+                      console.log(`✅ Generated image for ${dish.name}:`, imageUrl)
+                    }}
+                    onError={(error) => {
+                      console.error(`❌ Failed to generate image for ${dish.name}:`, error)
+                    }}
+                  />
+                  
+                  {/* Dish Details */}
+                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-3">
+                    <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+                      {dish.name}
+                    </h4>
+                    {dish.description && (
+                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                        {dish.description}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-purple-400 font-medium">
+                        {dish.cuisineType} Style
+                      </span>
+                      <span className="text-xs text-green-400">
+                        ✅ Recommended
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
