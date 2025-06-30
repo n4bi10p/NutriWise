@@ -326,29 +326,29 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 h-full overflow-y-auto custom-scrollbar p-3 sm:p-0">
       {/* Session Restored Notification */}
       {sessionRestored && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center">
-          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
-            <Search className="w-4 h-4 text-white" />
+        <div className="bg-green-500/10 border border-green-500/20 rounded-lg sm:rounded-xl p-3 sm:p-4 flex items-center">
+          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-500 rounded-full flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+            <Search className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
           </div>
-          <div>
-            <p className="text-green-400 font-medium text-sm">Session Restored</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-green-400 font-medium text-xs sm:text-sm">Session Restored</p>
             <p className="text-green-300/80 text-xs">Your previous menu analysis has been restored</p>
           </div>
         </div>
       )}
       
-      <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mr-3">
-              <Search className="w-6 h-6 text-white" />
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="flex items-center min-w-0 flex-1">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg sm:rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+              <Search className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Smart Menu Analyzer</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Upload a menu photo or paste text to get personalized recommendations</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">Smart Menu Analyzer</h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:block">Upload a menu photo or paste text to get personalized recommendations</p>
             </div>
           </div>
           
@@ -356,7 +356,7 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
           {(analysis || uploadedImage || recommendedDishes.length > 0) && (
             <button
               onClick={clearSession}
-              className="px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-lg transition-colors duration-200 border border-red-500/30"
+              className="px-2 sm:px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-lg transition-colors duration-200 border border-red-500/30 flex-shrink-0"
               title="Clear saved session"
             >
               Clear Session
@@ -471,11 +471,11 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
             Realistic AI-generated images of recommended Dishes.
           </p>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {recommendedDishes.map((dish, index) => {
               console.log(`🖼️ Rendering image for dish: "${dish.name}" with description: "${dish.description}" (${dish.cuisineType})`)
               return (
-                <div key={`${dish.name}-${index}`} className="space-y-3">
+                <div key={`${dish.name}-${index}`} className="space-y-2 sm:space-y-3">
                   <VertexAIImageGenerator
                     dishName={dish.name}
                     description={dish.description}
@@ -491,16 +491,16 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
                   />
                   
                   {/* Dish Details */}
-                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-3">
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-2 sm:p-3">
+                    <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm">
                       {dish.name}
                     </h4>
                     {dish.description && (
-                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                         {dish.description}
                       </p>
                     )}
-                    <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
                       <span className="text-xs text-purple-400 font-medium">
                         {dish.cuisineType} Style
                       </span>
