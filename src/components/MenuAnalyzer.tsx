@@ -1,10 +1,20 @@
 import React, { useState, useRef } from 'react'
 import { Profile } from '../lib/supabase'
 import { analyzeMenu, analyzeMenuWithImage } from '../lib/gemini'
-import { Search, Loader, Upload, Camera, X, Image as ImageIcon } from 'lucide-react'
+import { Search, Loader, Upload, Camera, X, Image as ImageIcon, Sparkles } from 'lucide-react'
+import { VertexAIImageGenerator } from './VertexAIImageGenerator'
 
 interface MenuAnalyzerProps {
   profile: Profile
+}
+
+interface RecommendedDish {
+  name: string;
+  description?: string;
+  cuisineType?: string;
+  calories?: string;
+  protein?: string;
+  benefits?: string;
 }
 
 export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
@@ -13,6 +23,7 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
   const [loading, setLoading] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const [recommendedDishes, setRecommendedDishes] = useState<RecommendedDish[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,6 +50,8 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
     if (!menu.trim() && !imageFile) return
     
     setLoading(true)
+    setRecommendedDishes([]) // Clear previous dishes
+    
     try {
       let result: string
       
@@ -60,11 +73,123 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
       }
       
       setAnalysis(result)
+      
+      // Extract recommended dishes for AI image generation
+      const dishes = extractRecommendedDishes(result)
+      setRecommendedDishes(dishes)
+      
     } catch (error) {
       setAnalysis('Sorry, I encountered an error analyzing the menu. Please try again.')
+      setRecommendedDishes([])
     } finally {
       setLoading(false)
     }
+  }
+
+  // Extract dish recommendations from analysis text
+  const extractRecommendedDishes = (analysisText: string): RecommendedDish[] => {
+    const dishes: RecommendedDish[] = []
+    
+    console.log('🔍 Extracting dishes from analysis:', analysisText.substring(0, 500))
+    
+    // More specific pattern to match numbered dish recommendations
+    // Look for patterns like "1. Dish Name:" or "1. Dish Name -" or "1. **Dish Name**:"
+    const dishPattern = /(?:^|\n)\s*(\d+)\.\s*(?:\*\*)?([^:\*\n]+?)(?:\*\*)?\s*[:–-]?\s*([^\n]*)/gm
+    
+    let match
+    while ((match = dishPattern.exec(analysisText)) !== null && dishes.length < 4) {
+      const dishNumber = match[1]
+      let dishName = match[2]?.trim()
+      let description = match[3]?.trim()
+      
+      console.log(`🔍 Found potential dish ${dishNumber}: "${dishName}" with description: "${description}"`)
+      
+      if (dishName && dishName.length > 5 && dishName.length < 80) {
+        // Clean up dish name
+        dishName = dishName
+          .replace(/[*_]/g, '') // Remove markdown formatting
+          .replace(/^\d+\.\s*/, '') // Remove numbering
+          .replace(/^[-–]\s*/, '') // Remove leading dashes
+          .trim()
+        
+        // Skip if it's not a proper dish name (contains explanatory text)
+        if (dishName.toLowerCase().includes('why it fits') || 
+            dishName.toLowerCase().includes('estimated calories') ||
+            dishName.toLowerCase().includes('nutritional benefits') ||
+            dishName.toLowerCase().includes('suggested modifications') ||
+            dishName.toLowerCase().includes('this is likely') ||
+            dishName.toLowerCase().includes('protein content')) {
+          console.log(`⏭️ Skipping non-dish text: "${dishName}"`)
+          continue
+        }
+        
+        // Check if we already have this dish
+        if (dishes.some(d => d.name.toLowerCase() === dishName.toLowerCase())) {
+          continue
+        }
+        
+        // Determine cuisine type from dish name or profile
+        let cuisineType = 'indian' // Default
+        if (dishName.toLowerCase().includes('biryani') || dishName.toLowerCase().includes('curry') || 
+            dishName.toLowerCase().includes('dal') || dishName.toLowerCase().includes('paneer') ||
+            dishName.toLowerCase().includes('murg') || dishName.toLowerCase().includes('gosht')) {
+          cuisineType = 'indian'
+        } else if (dishName.toLowerCase().includes('greek')) {
+          cuisineType = 'mediterranean'
+        } else if (dishName.toLowerCase().includes('prawns') || dishName.toLowerCase().includes('seafood')) {
+          cuisineType = 'modern'
+        } else if (profile.regional_preference) {
+          cuisineType = profile.regional_preference.toLowerCase()
+        }
+        
+        // Clean up description if it contains dish analysis
+        if (description && description.toLowerCase().includes('this is likely')) {
+          description = `Traditional ${cuisineType} dish with rich flavors`
+        }
+        
+        console.log(`✅ Extracted dish: "${dishName}" (${cuisineType}) with description: "${description}"`)
+        
+        dishes.push({
+          name: dishName,
+          description: description || `Traditional ${cuisineType} dish`,
+          cuisineType: cuisineType
+        })
+      }
+    }
+    
+    console.log(`🍽️ Total dishes extracted: ${dishes.length}`, dishes)
+    
+    // If we couldn't extract enough dishes from the numbered format, try to find specific dish names
+    if (dishes.length === 0) {
+      console.log('⚠️ No dishes extracted from numbered format, trying specific dish name search...')
+      
+      // Look for common Indian dish names in the text
+      const commonDishes = [
+        'Murg Matka Dum Biryani', 'Gosht Hyderabadi Dum Biryani', 'Prawns Dum Biryani',
+        'Greek Salad', 'Chicken Biryani', 'Mutton Biryani', 'Lamb Curry', 'Chicken Curry',
+        'Dal Makhani', 'Paneer Makhani', 'Butter Chicken', 'Tandoori Chicken'
+      ]
+      
+      for (const dishName of commonDishes) {
+        if (analysisText.toLowerCase().includes(dishName.toLowerCase()) && dishes.length < 4) {
+          let cuisineType = 'indian'
+          if (dishName.toLowerCase().includes('greek')) {
+            cuisineType = 'mediterranean'
+          } else if (dishName.toLowerCase().includes('prawns')) {
+            cuisineType = 'modern'
+          }
+          
+          dishes.push({
+            name: dishName,
+            description: `Traditional ${cuisineType} dish with authentic flavors`,
+            cuisineType: cuisineType
+          })
+          console.log(`🔄 Added specific dish: ${dishName}`)
+        }
+      }
+    }
+    
+    return dishes
   }
 
   return (
@@ -172,6 +297,59 @@ export function MenuAnalyzer({ profile }: MenuAnalyzerProps) {
             <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
               {analysis}
             </pre>
+          </div>
+        </div>
+      )}
+
+      {/* AI Generated Food Images */}
+      {recommendedDishes.length > 0 && (
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <Sparkles className="w-5 h-5 mr-2 text-purple-500" />
+            AI Generated Food Images
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+            Realistic AI-generated images of recommended Dishes.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recommendedDishes.map((dish, index) => (
+              <div key={`${dish.name}-${index}`} className="space-y-3">
+                <VertexAIImageGenerator
+                  dishName={dish.name}
+                  description={dish.description}
+                  cuisineType={dish.cuisineType || 'modern'}
+                  plating="elegant"
+                  className="w-full"
+                  onImageGenerated={(imageUrl) => {
+                    console.log(`✅ Generated image for ${dish.name}:`, imageUrl)
+                  }}
+                  onError={(error) => {
+                    console.error(`❌ Failed to generate image for ${dish.name}:`, error)
+                  }}
+                />
+                
+                {/* Dish Details */}
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-3">
+                  <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+                    {dish.name}
+                  </h4>
+                  {dish.description && (
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                      {dish.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-purple-400 font-medium">
+                      {dish.cuisineType} Style
+                    </span>
+                    <span className="text-xs text-green-400">
+                      ✅ Recommended
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

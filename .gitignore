@@ -8,9 +8,26 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+server/node_modules
 dist
 dist-ssr
 *.local
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Google Cloud credentials
+credentials.json
+service-account.json
+gcp-key.json
+
+# Server environment
+server/.env
+server/credentials.json
 
 # Editor directories and files
 .vscode/*

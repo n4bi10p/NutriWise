@@ -1,0 +1,31 @@
+{
+  "name": "nutriwise-vertex-ai-server",
+  "version": "1.0.0",
+  "description": "Vertex AI Image Generation Server for NutriWise",
+  "main": "vertex-ai.js",
+  "scripts": {
+    "start": "node vertex-ai.js",
+    "dev": "nodemon vertex-ai.js",
+    "test": "node -e \"console.log('Server can be started with npm start')\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "google-auth-library": "^9.15.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "vertex-ai",
+    "image-generation",
+    "google-cloud",
+    "food-photography"
+  ],
+  "author": "NutriWise Team",
+  "license": "MIT"
+}
