@@ -160,50 +160,327 @@ function createFoodPrompt(dishName, description, cuisineType, plating) {
   // Base prompt for professional food photography
   let prompt = `Professional food photography of ${dishName}, `;
   
-  // Add specific details based on dish type
-  if (dishName.toLowerCase().includes('biryani')) {
-    prompt += 'aromatic basmati rice layered with tender marinated meat, garnished with fried onions, fresh mint leaves, and saffron, served in traditional copper or clay pot, ';
-  } else if (dishName.toLowerCase().includes('curry')) {
-    prompt += 'rich and flavorful curry with tender pieces of meat or vegetables in aromatic spices and thick gravy, ';
-  } else if (dishName.toLowerCase().includes('greek salad')) {
-    prompt += 'fresh Mediterranean salad with crisp lettuce, ripe tomatoes, cucumber, red onions, kalamata olives, and feta cheese, drizzled with olive oil, ';
-  } else if (dishName.toLowerCase().includes('prawns')) {
-    prompt += 'succulent prawns cooked to perfection with aromatic spices and herbs, ';
-  } else {
-    prompt += 'beautifully prepared dish with authentic ingredients and traditional cooking methods, ';
-  }
-
-  // Add cuisine-specific styling
-  const cuisineStyles = {
-    indian: 'served on traditional brass or copper tableware with banana leaf garnish, basmati rice on the side, Indian bread, vibrant spices visible, warm golden lighting',
-    mediterranean: 'presented on rustic ceramic plates with olive oil drizzle, fresh herbs, lemon wedges, and traditional Mediterranean elements',
-    chinese: 'arranged on elegant porcelain with chopsticks and traditional garnishes, clean presentation',
-    mexican: 'served on colorful ceramic plates with lime wedges and cilantro',
-    japanese: 'presented on minimalist ceramic with clean lines and artistic arrangement',
-    thai: 'served in traditional bowls with aromatic herbs and chili garnish',
-    modern: 'plated with contemporary presentation and microgreens, artistic plating'
+  const dishLower = dishName.toLowerCase();
+  const descriptionLower = (description || '').toLowerCase();
+  
+  // Comprehensive food categorization
+  const foodCategories = {
+    // Beverages
+    coffee: ['coffee', 'latte', 'cappuccino', 'espresso', 'mocha', 'americano', 'macchiato', 'cortado', 'flat white', 'cold brew', 'frappuccino'],
+    tea: ['tea', 'chai', 'matcha', 'green tea', 'black tea', 'herbal tea', 'oolong', 'earl grey', 'chamomile'],
+    shakes: ['shake', 'smoothie', 'milkshake', 'protein shake', 'fruit shake', 'chocolate shake', 'vanilla shake'],
+    juices: ['juice', 'fresh lime', 'orange juice', 'apple juice', 'grape juice', 'cranberry juice', 'pomegranate juice', 'green juice'],
+    alcoholic: ['beer', 'wine', 'cocktail', 'whiskey', 'vodka', 'rum', 'gin', 'margarita', 'mojito', 'bloody mary'],
+    
+    // Indian Regional Cuisines
+    northIndian: ['biryani', 'butter chicken', 'dal makhani', 'naan', 'tandoori', 'paneer', 'roti', 'chole', 'rajma', 'kadai', 'malai kofta'],
+    southIndian: ['dosa', 'idli', 'sambhar', 'rasam', 'uttapam', 'vada', 'coconut rice', 'curd rice', 'medu vada', 'appam', 'kootu'],
+    bengali: ['fish curry', 'machher jhol', 'rasgulla', 'sandesh', 'mishti doi', 'kosha mangsho', 'chingri malai curry'],
+    gujarati: ['dhokla', 'khandvi', 'thepla', 'undhiyu', 'khaman', 'fafda', 'gujarati thali'],
+    punjabi: ['makki di roti', 'sarson da saag', 'amritsari kulcha', 'chole bhature', 'punjabi kadhi'],
+    maharashtrian: ['vada pav', 'misal pav', 'puran poli', 'bhel puri', 'pav bhaji', 'modak', 'batata vada'],
+    rajasthani: ['dal baati churma', 'laal maas', 'gatte ki sabzi', 'ker sangri', 'bajre ki roti'],
+    kerala: ['kerala fish curry', 'appam with stew', 'puttu', 'fish moilee', 'banana chips', 'payasam'],
+    
+    // International Cuisines
+    italian: ['pasta', 'pizza', 'risotto', 'lasagna', 'carbonara', 'bolognese', 'margherita', 'tiramisu', 'gelato', 'bruschetta'],
+    chinese: ['fried rice', 'chow mein', 'kung pao', 'sweet and sour', 'dim sum', 'peking duck', 'hot pot', 'mapo tofu'],
+    mexican: ['taco', 'burrito', 'quesadilla', 'enchilada', 'guacamole', 'nachos', 'churros', 'fajita', 'tamale'],
+    japanese: ['sushi', 'ramen', 'tempura', 'miso soup', 'yakitori', 'teriyaki', 'bento', 'udon', 'sashimi'],
+    thai: ['pad thai', 'tom yum', 'green curry', 'red curry', 'som tam', 'massaman curry', 'mango sticky rice'],
+    french: ['croissant', 'baguette', 'ratatouille', 'coq au vin', 'bouillabaisse', 'crème brûlée', 'macarons'],
+    greek: ['greek salad', 'moussaka', 'souvlaki', 'gyros', 'tzatziki', 'spanakopita', 'baklava'],
+    mediterranean: ['hummus', 'falafel', 'tabouleh', 'baba ganoush', 'dolma', 'shawarma'],
+    american: ['burger', 'hot dog', 'barbecue', 'mac and cheese', 'buffalo wings', 'cheesecake', 'apple pie'],
+    korean: ['kimchi', 'bulgogi', 'bibimbap', 'korean bbq', 'japchae', 'tteokbokki'],
+    
+    // Food Types
+    breakfast: ['pancake', 'waffle', 'french toast', 'omelet', 'cereal', 'oatmeal', 'bagel', 'muffin', 'croissant'],
+    lunch: ['sandwich', 'wrap', 'salad bowl', 'soup and sandwich', 'club sandwich', 'panini'],
+    dinner: ['steak', 'roast chicken', 'salmon', 'lamb chops', 'pork tenderloin', 'beef stew'],
+    desserts: ['cake', 'ice cream', 'pudding', 'pie', 'tart', 'cookies', 'brownies', 'mousse', 'parfait'],
+    snacks: ['chips', 'popcorn', 'nuts', 'crackers', 'pretzels', 'fruit', 'cheese and crackers'],
+    
+    // Cooking Methods
+    grilled: ['grilled chicken', 'bbq', 'grilled vegetables', 'grilled fish', 'barbecue ribs'],
+    fried: ['fried chicken', 'french fries', 'fried rice', 'tempura', 'fish and chips'],
+    baked: ['baked potato', 'baked chicken', 'baked goods', 'casserole', 'roasted vegetables'],
+    steamed: ['steamed dumplings', 'steamed fish', 'steamed vegetables', 'steamed buns'],
+    
+    // Street Food
+    streetFood: ['street food', 'food truck', 'vendor food', 'chaat', 'gol gappa', 'aloo tikki', 'corn on the cob']
   };
 
-  if (cuisineStyles[cuisineType.toLowerCase()]) {
-    prompt += cuisineStyles[cuisineType.toLowerCase()];
-  } else {
-    prompt += 'served with traditional presentation and authentic garnishes';
+  // Function to detect food category
+  function detectFoodCategory() {
+    for (const [category, keywords] of Object.entries(foodCategories)) {
+      if (keywords.some(keyword => dishLower.includes(keyword))) {
+        return category;
+      }
+    }
+    return 'general';
   }
+
+  const foodCategory = detectFoodCategory();
+  const isBeverage = ['coffee', 'tea', 'shakes', 'juices', 'alcoholic'].includes(foodCategory);
+
+  // Add category-specific descriptions
+  switch (foodCategory) {
+    case 'coffee':
+      prompt += 'perfectly brewed coffee with rich crema and aromatic steam rising, served in elegant ceramic cup with matching saucer, ';
+      break;
+    case 'tea':
+      if (dishLower.includes('chai')) {
+        prompt += 'traditional Indian chai with milk, aromatic spices, served in cutting glass or ceramic cup with steam rising, ';
+      } else {
+        prompt += 'freshly brewed tea with clear liquid and aromatic steam, served in elegant porcelain cup or traditional glass, ';
+      }
+      break;
+    case 'shakes':
+      prompt += 'thick creamy shake with perfect consistency, topped with whipped cream or fresh garnish, served in tall glass with colorful straw, ';
+      break;
+    case 'juices':
+      prompt += 'fresh vibrant juice with natural colors, served in clear glass with fruit garnish and ice cubes, ';
+      break;
+    case 'alcoholic':
+      prompt += 'expertly crafted alcoholic beverage with proper garnish and glassware, professional bar presentation, ';
+      break;
+    case 'northIndian':
+      prompt += 'authentic North Indian dish with aromatic spices, rich gravies, and traditional garnishes like fresh coriander, fried onions, ';
+      break;
+    case 'southIndian':
+      prompt += 'traditional South Indian dish with coconut-based preparations, curry leaves, and served on banana leaf or steel plate, ';
+      break;
+    case 'bengali':
+      prompt += 'authentic Bengali cuisine with mustard oil, panch phoron spices, and traditional fish preparations, ';
+      break;
+    case 'gujarati':
+      prompt += 'traditional Gujarati dish with sweet and savory flavors, steamed preparations, and colorful presentation, ';
+      break;
+    case 'punjabi':
+      prompt += 'hearty Punjabi cuisine with rich butter-based gravies, tandoori preparations, and rustic presentation, ';
+      break;
+    case 'maharashtrian':
+      prompt += 'authentic Maharashtrian street food with spicy flavors, chutneys, and traditional Mumbai-style presentation, ';
+      break;
+    case 'rajasthani':
+      prompt += 'royal Rajasthani cuisine with rich gravies, desert spices, and traditional thali presentation, ';
+      break;
+    case 'kerala':
+      prompt += 'authentic Kerala dish with coconut milk, curry leaves, and traditional backwater region flavors, ';
+      break;
+    case 'italian':
+      prompt += 'authentic Italian cuisine with fresh herbs, quality olive oil, parmesan cheese, and rustic Mediterranean presentation, ';
+      break;
+    case 'chinese':
+      prompt += 'traditional Chinese dish with wok-fried ingredients, balanced flavors, and elegant chopstick presentation, ';
+      break;
+    case 'mexican':
+      prompt += 'vibrant Mexican dish with fresh cilantro, lime wedges, colorful peppers, and traditional ceramic serving, ';
+      break;
+    case 'japanese':
+      prompt += 'authentic Japanese cuisine with minimalist presentation, fresh ingredients, and traditional ceramic or wooden serving, ';
+      break;
+    case 'thai':
+      prompt += 'aromatic Thai dish with fresh herbs, chili garnish, and traditional Thai ceramic or banana leaf serving, ';
+      break;
+    case 'french':
+      prompt += 'elegant French cuisine with refined presentation, fresh herbs, and sophisticated plating techniques, ';
+      break;
+    case 'greek':
+      prompt += 'fresh Mediterranean dish with olive oil drizzle, feta cheese, olives, and rustic Greek presentation, ';
+      break;
+    case 'american':
+      prompt += 'classic American dish with generous portions, fresh ingredients, and casual diner-style presentation, ';
+      break;
+    case 'korean':
+      prompt += 'authentic Korean dish with fermented flavors, sesame garnish, and traditional Korean ceramic serving, ';
+      break;
+    case 'breakfast':
+      prompt += 'hearty breakfast dish with golden colors, fresh ingredients, and morning comfort food presentation, ';
+      break;
+    case 'desserts':
+      prompt += 'decadent dessert with rich textures, beautiful garnish, and elegant sweet presentation, ';
+      break;
+    case 'streetFood':
+      prompt += 'authentic street food with vibrant colors, multiple chutneys, and traditional vendor-style presentation, ';
+      break;
+    case 'grilled':
+      prompt += 'perfectly grilled with beautiful char marks, smoky aroma, and rustic barbecue presentation, ';
+      break;
+    case 'fried':
+      prompt += 'golden fried with crispy texture, perfect browning, and casual comfort food presentation, ';
+      break;
+    default:
+      prompt += 'beautifully prepared dish with authentic ingredients, traditional cooking methods, and appetizing presentation, ';
+  }
+
+  // Comprehensive cuisine-specific styling and presentation
+  const cuisineStyles = {
+    // Indian Regional Styles
+    indian: 'served on traditional brass thali, copper bowls, or banana leaf with basmati rice, Indian breads, vibrant spices visible, warm golden lighting, traditional Indian table setting',
+    northindian: 'presented on brass or steel plates with naan, roti, pickles, and yogurt on the side, rich gravies, garnished with fresh coriander and fried onions',
+    southindian: 'served on banana leaf or steel plates with sambhar, coconut chutney, rasam, and rice, traditional South Indian presentation with curry leaves',
+    bengali: 'served on traditional white plates with rice, fish curry, and Bengali sweets on the side, authentic Bengali home-style presentation',
+    gujarati: 'presented on silver thali with multiple small bowls, rotli, rice, and sweet dish, colorful Gujarati feast presentation',
+    punjabi: 'served on rustic plates with makki di roti, white butter, jaggery, and lassi, hearty Punjabi dhaba-style presentation',
+    maharashtrian: 'street food style presentation with newspaper wrapping or steel plates, multiple chutneys, and Mumbai street vendor aesthetics',
+    rajasthani: 'royal presentation on decorated thali with multiple courses, traditional Rajasthani royal dining style',
+    kerala: 'served on banana leaf with coconut-based curries, appam, and traditional Kerala backwater region presentation',
+    
+    // International Styles
+    italian: 'served on rustic ceramic plates with fresh basil, parmesan cheese, olive oil drizzle, crusty bread, Italian countryside presentation',
+    chinese: 'presented on elegant porcelain with chopsticks, tea cups, lazy susan, traditional Chinese restaurant style with red and gold accents',
+    mexican: 'served on colorful ceramic plates with lime wedges, cilantro, salsa, and tortillas, vibrant Mexican cantina presentation',
+    japanese: 'minimalist presentation on traditional ceramic plates with bamboo elements, wasabi, ginger, soy sauce, zen-like styling',
+    thai: 'served in traditional Thai bowls with jasmine rice, fresh herbs, chili, lime, and banana leaf elements',
+    french: 'elegant fine dining presentation with white plates, silver cutlery, wine glasses, sophisticated French bistro styling',
+    greek: 'rustic Mediterranean presentation with olive oil, olives, feta cheese, pita bread, and blue and white Greek elements',
+    mediterranean: 'served on terracotta plates with olive oil, fresh herbs, lemon, and rustic Mediterranean coastal styling',
+    american: 'casual diner presentation with large portions, condiments, pickles, and classic American comfort food styling',
+    korean: 'served with multiple banchan (side dishes), metal chopsticks, rice bowls, and traditional Korean ceramic',
+    middle_eastern: 'presented on decorative plates with pita bread, hummus, olives, and traditional Middle Eastern elements',
+    
+    // Cooking Style Presentations
+    streetfood: 'authentic street vendor presentation with paper plates, plastic cutlery, multiple sauces, and bustling street food atmosphere',
+    fine_dining: 'elegant restaurant presentation with white tablecloth, crystal glasses, silver cutlery, and artistic plating',
+    homestyle: 'warm family-style presentation with comfortable dishes, generous portions, and cozy home dining atmosphere',
+    cafe: 'modern café presentation with wooden tables, ceramic mugs, fresh flowers, and casual bistro styling',
+    buffet: 'abundant buffet-style presentation with multiple dishes, serving spoons, and feast-like arrangement',
+    
+    // Modern Styles
+    fusion: 'creative fusion presentation blending traditional and modern elements with artistic plating',
+    molecular: 'avant-garde molecular gastronomy presentation with unique textures and scientific precision',
+    farm_to_table: 'rustic farm-fresh presentation with wooden boards, mason jars, and organic garden aesthetics',
+    vegan: 'colorful plant-based presentation with fresh vegetables, grains, and modern health-conscious styling',
+    keto: 'low-carb presentation focusing on proteins, healthy fats, and fresh vegetables with modern health styling',
+    
+    // Default styles
+    modern: 'contemporary presentation with clean lines, white plates, microgreens, and artistic arrangement',
+    traditional: 'authentic cultural presentation with traditional serving methods and historical accuracy',
+    rustic: 'homestyle presentation with natural textures, wooden elements, and comfortable family dining',
+    elegant: 'sophisticated presentation with fine china, crystal, and upscale restaurant styling'
+  };
+
+  // Enhanced plating styles with detailed descriptions
+  const platingStyles = {
+    elegant: ', sophisticated fine dining presentation with artistic arrangement, microgreens, sauce dots, and chef-quality plating',
+    rustic: ', homestyle comfort food presentation with generous portions, natural textures, and family-style serving',
+    modern: ', contemporary minimalist plating with clean lines, negative space, and Instagram-worthy presentation',
+    traditional: ', authentic cultural presentation respecting traditional serving methods and historical accuracy',
+    street: ', authentic street food presentation with paper wrapping, plastic containers, and vendor-style serving',
+    fine_dining: ', michelin-star quality presentation with precise plating, artistic garnish, and restaurant elegance',
+    casual: ', relaxed everyday presentation with comfortable portions and approachable styling',
+    festive: ', celebration-style presentation with decorative elements, abundant portions, and party atmosphere'
+  };
+
+  // Determine appropriate styling based on food category and cuisine
+  let selectedStyle = '';
+  
+  if (isBeverage) {
+    // Special handling for beverages
+    if (foodCategory === 'coffee') {
+      selectedStyle = 'served on elegant coffee saucer with coffee beans nearby, modern café presentation, warm ambient lighting';
+    } else if (foodCategory === 'tea' && dishLower.includes('chai')) {
+      selectedStyle = 'served in traditional cutting glass or ceramic cup, Indian street-side tea stall presentation, steam rising';
+    } else if (foodCategory === 'shakes') {
+      selectedStyle = 'served in tall glass or mason jar with colorful straw, modern beverage presentation, appealing garnish';
+    } else if (foodCategory === 'juices') {
+      selectedStyle = 'served in clear glass with fresh fruit slices, bright and refreshing presentation, natural lighting';
+    } else if (foodCategory === 'alcoholic') {
+      selectedStyle = 'served in appropriate glassware with proper garnish, professional bar presentation, ambient bar lighting';
+    } else {
+      selectedStyle = 'served with modern beverage presentation, clean and appealing styling';
+    }
+  } else {
+    // Food styling based on cuisine type and category
+    const cuisineKey = cuisineType.toLowerCase().replace(/[\s-]/g, '');
+    if (cuisineStyles[cuisineKey]) {
+      selectedStyle = cuisineStyles[cuisineKey];
+    } else if (cuisineStyles[foodCategory]) {
+      selectedStyle = cuisineStyles[foodCategory];
+    } else {
+      selectedStyle = cuisineStyles.traditional;
+    }
+  }
+
+  prompt += selectedStyle;
 
   // Add plating style
-  const platingStyles = {
-    elegant: ', sophisticated fine dining presentation with artistic arrangement',
-    rustic: ', homestyle presentation with natural textures and traditional serving',
-    modern: ', contemporary minimalist plating with clean lines',
-    traditional: ', authentic cultural presentation with traditional serving methods'
-  };
-
-  if (platingStyles[plating.toLowerCase()]) {
-    prompt += platingStyles[plating.toLowerCase()];
+  const platingKey = plating.toLowerCase();
+  if (platingStyles[platingKey]) {
+    prompt += platingStyles[platingKey];
+  } else {
+    prompt += platingStyles.elegant;
   }
 
-  // Add professional photography elements
-  prompt += '. Shot with professional DSLR camera, studio lighting setup, shallow depth of field background blur, appetizing warm colors, high resolution 4K quality, commercial food photography style, detailed textures, steam rising from hot food, glossy sauce finish, garnish details visible, restaurant quality presentation, overhead or 45-degree angle, soft shadows, vibrant and realistic colors';
+  // Add professional photography elements with category-specific details
+  prompt += '. Shot with professional DSLR camera, studio lighting setup, shallow depth of field background blur, appetizing warm colors, high resolution 4K quality, commercial food photography style, detailed textures';
+  
+  // Add specific visual elements based on food type
+  if (isBeverage) {
+    prompt += ', steam or condensation droplets visible where appropriate, perfect beverage clarity and color';
+    if (foodCategory === 'coffee') {
+      prompt += ', rich brown crema, aromatic steam wisps, coffee bean texture visible';
+    } else if (foodCategory === 'tea') {
+      prompt += ', clear liquid with natural tea color, delicate steam patterns';
+    } else if (foodCategory === 'shakes') {
+      prompt += ', creamy texture visible, foam or whipped cream details, straw reflection';
+    } else if (foodCategory === 'juices') {
+      prompt += ', vibrant natural fruit colors, fresh pulp texture, ice cube reflections';
+    }
+  } else {
+    prompt += ', steam rising from hot food where appropriate, glossy sauce finish, garnish details visible';
+    
+    // Add specific visual details for different food categories
+    if (['northIndian', 'southIndian', 'bengali', 'gujarati', 'punjabi', 'maharashtrian', 'rajasthani', 'kerala'].includes(foodCategory)) {
+      prompt += ', vibrant spice colors, rich curry textures, aromatic steam, traditional Indian garnish details';
+    } else if (['italian', 'mediterranean'].includes(foodCategory)) {
+      prompt += ', olive oil sheen, fresh herb colors, cheese texture details, rustic bread textures';
+    } else if (foodCategory === 'chinese') {
+      prompt += ', glossy sauce coating, wok hei aroma visualization, precise ingredient cuts, steam wisps';
+    } else if (foodCategory === 'japanese') {
+      prompt += ', pristine ingredient freshness, clean cuts, minimalist garnish, natural textures';
+    } else if (foodCategory === 'mexican') {
+      prompt += ', vibrant chili colors, fresh cilantro green, lime juice glistening, colorful pepper textures';
+    } else if (foodCategory === 'thai') {
+      prompt += ', aromatic herb freshness, chili oil sheen, coconut milk richness, banana leaf texture';
+    } else if (foodCategory === 'french') {
+      prompt += ', refined sauce work, herb oil drizzles, elegant garnish precision, fine dining aesthetics';
+    } else if (foodCategory === 'american') {
+      prompt += ', generous portion appeal, comfort food textures, melted cheese details, crispy elements';
+    } else if (foodCategory === 'desserts') {
+      prompt += ', rich chocolate textures, cream smoothness, fruit freshness, sugar crystal details';
+    } else if (foodCategory === 'breakfast') {
+      prompt += ', golden brown textures, butter melting, syrup flow, morning light warmth';
+    } else if (foodCategory === 'grilled') {
+      prompt += ', perfect grill marks, smoky char details, juicy meat textures, flame-kissed appearance';
+    } else if (foodCategory === 'fried') {
+      prompt += ', golden crispy coating, oil-free appearance, perfect browning, crunchy texture details';
+    } else if (foodCategory === 'streetFood') {
+      prompt += ', authentic street vendor appearance, multiple sauce colors, casual serving style, vibrant spice dusting';
+    }
+  }
+  
+  // Final photography and lighting specifications
+  prompt += ', restaurant quality presentation, optimal camera angle (overhead, 45-degree, or straight-on as appropriate)';
+  prompt += ', soft natural shadows, vibrant and realistic colors, perfect focus on main subject';
+  prompt += ', professional food styling, appetizing appeal, commercial photography standards';
+  
+  // Add appropriate background and context
+  if (isBeverage) {
+    prompt += ', clean background with subtle cafe or bar elements, soft focus supporting props';
+  } else if (['streetFood', 'punjabi', 'maharashtrian'].includes(foodCategory)) {
+    prompt += ', authentic rustic background with traditional elements, street food atmosphere';
+  } else if (['japanese', 'korean'].includes(foodCategory)) {
+    prompt += ', minimalist background with traditional Asian elements, zen-like simplicity';
+  } else if (['italian', 'mediterranean', 'french'].includes(foodCategory)) {
+    prompt += ', rustic European background with traditional cooking elements, countryside charm';
+  } else if (foodCategory === 'fine_dining' || plating === 'elegant') {
+    prompt += ', luxury restaurant background with upscale dining elements, sophisticated ambiance';
+  } else {
+    prompt += ', clean neutral background with appropriate cultural or cooking context elements';
+  }
 
   return prompt;
 }
