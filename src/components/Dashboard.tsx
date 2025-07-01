@@ -255,7 +255,15 @@ export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileU
                 </button>
                 
                 <button
-                  onClick={onSignOut}
+                  onClick={async () => {
+                    try {
+                      await supabase.auth.signOut();
+                    } catch (e) {
+                      console.error('Sign out error:', e);
+                    } finally {
+                      onSignOut();
+                    }
+                  }}
                   className="p-1.5 sm:p-2 lg:p-2.5 hover:bg-red-500/20 rounded-lg transition-all duration-300 group flex-shrink-0"
                   title="Sign out"
                 >
