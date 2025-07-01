@@ -211,24 +211,9 @@ export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileU
                 </div>
               </div>
             </div>
-            
-            {/* Right Section - Mobile Stats and Action Buttons */}
-            <div className="flex items-center justify-end flex-shrink-0 min-w-0">
-              {/* Mobile/Tablet Stats (shown on smaller screens) */}
-              <div className="xl:hidden flex items-center space-x-1 mr-1 sm:mr-2 overflow-hidden flex-shrink-0">
-                <div className="text-center bg-white/20 dark:bg-white/5 backdrop-blur-lg border border-white/30 dark:border-white/10 rounded-lg px-1 py-1 shadow-md min-w-0 flex-shrink-0">
-                  <div className="text-xs font-bold text-gray-800 dark:text-white">{profile.points}</div>
-                  <div className="text-[10px] text-gray-600 dark:text-gray-300 hidden sm:block">Pts</div>
-                </div>
-                <div className="text-center bg-white/20 dark:bg-white/5 backdrop-blur-lg border border-white/30 dark:border-white/10 rounded-lg px-1 py-1 shadow-md min-w-0 flex-shrink-0">
-                  <div className="text-xs font-bold text-gray-800 dark:text-white">{profile.streak_days}</div>
-                  <div className="text-[10px] text-gray-600 dark:text-gray-300 hidden sm:block">Days</div>
-                </div>
-                <div className="text-center bg-white/20 dark:bg-white/5 backdrop-blur-lg border border-white/30 dark:border-white/10 rounded-lg px-1 py-1 shadow-md min-w-0 flex-shrink-0">
-                  <div className="text-xs font-bold text-gray-800 dark:text-white">L{profile.level}</div>
-                </div>
-              </div>
 
+            {/* Right Section - Action Buttons */}
+            <div className="flex items-center justify-end flex-shrink-0 min-w-0">
               {/* Action Buttons */}
               <div className="flex items-center space-x-0.5 sm:space-x-1 bg-white/25 dark:bg-white/10 backdrop-blur-lg border border-white/40 dark:border-white/10 rounded-lg sm:rounded-xl p-0.5 sm:p-1 shadow-xl flex-shrink-0">
                 <button 
@@ -372,8 +357,8 @@ export function Dashboard({ user, profile: initialProfile, onSignOut, onProfileU
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="mt-3 sm:mt-4 bg-white/30 dark:bg-white/5 backdrop-blur-lg border border-white/40 dark:border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl">
+          {/* Quick Stats - Desktop Only */}
+          <div className="hidden lg:block mt-3 sm:mt-4 bg-white/30 dark:bg-white/5 backdrop-blur-lg border border-white/40 dark:border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl">
             <h3 className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 sm:mb-3 uppercase tracking-wide">Quick Stats</h3>
             <div className="space-y-2 sm:space-y-3">
               <div className="flex justify-between text-xs sm:text-sm">
