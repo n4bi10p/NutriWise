@@ -36,7 +36,10 @@ export function AuthForm({ onAuthSuccess, error: propError }: AuthFormProps) {
         }
         
         console.log('Sign in successful:', data.user?.id)
-        onAuthSuccess()
+        // Force reload to ensure auth state is picked up by App
+        window.location.reload()
+        // Optionally, you can still call onAuthSuccess() if you want
+        // onAuthSuccess()
       } else {
         console.log('Attempting to sign up with:', email)
         
